@@ -36,17 +36,8 @@ jobs:
       - name: Build debug APK
         run: gradle assembleDebug --stacktrace
 
-      - name: Publish pre-release with APK
-        uses: softprops/action-gh-release@v2
+      - name: Upload APK (QA branch only, no release)
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: debug-latest
-          name: "Aegis — debug build (latest)"
-          body: |
-            Automated debug build of **Aegis**.
-
-            - Commit: `${{ github.sha }}`
-            - Built by: [run #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-
-            Download `app-debug.apk` below and sideload it on your device.
-          prerelease: true
-          files: app/build/outputs/apk/debug/app-debug.apk
+          name: app-debug
+          path: app/build/outputs/apk/debug/app-debug.apk

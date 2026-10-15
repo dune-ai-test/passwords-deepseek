@@ -119,7 +119,7 @@ data class IdentityItem(
 data class VaultSettings(
     val autoLockMinutes: Int = 1,
     val biometricEnabled: Boolean = false,
-    val screenshotProtection: Boolean = true,
+    val screenshotProtection: Boolean = false,
     val lastBackupAt: Long? = null,
 )
 

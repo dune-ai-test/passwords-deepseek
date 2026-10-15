@@ -71,7 +71,7 @@ fun AegisApp(vm: AppViewModel, activity: FragmentActivity) {
     val message by vm.message.collectAsStateWithLifecycle()
 
     // Screenshot protection follows the setting (default: on).
-    val secure = vault?.settings?.screenshotProtection ?: true
+    val secure = vault?.settings?.screenshotProtection ?: false
     LaunchedEffect(secure) {
         if (secure) {
             activity.window.setFlags(
