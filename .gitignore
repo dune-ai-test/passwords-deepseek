@@ -1,0 +1,33 @@
+# ── Design mockups (stay local, not published) ──────────────────────────────
+/ui/
+
+# ── Gradle ───────────────────────────────────────────────────────────────────
+.gradle/
+build/
+**/build/
+
+# ── Android ──────────────────────────────────────────────────────────────────
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+captures/
+.externalNativeBuild/
+.cxx/
+
+# ── IDE ──────────────────────────────────────────────────────────────────────
+.idea/
+*.iml
+.vscode/
+*.hprof
+.kotlin/
+
+# ── Keystores / secrets ──────────────────────────────────────────────────────
+*.jks
+*.keystore
+keystore.properties
+
+# ── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db

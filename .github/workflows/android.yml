@@ -1,0 +1,52 @@
+name: Build debug APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: debug-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Run unit tests
+        run: gradle testDebugUnitTest --stacktrace
+
+      - name: Build debug APK
+        run: gradle assembleDebug --stacktrace
+
+      - name: Publish pre-release with APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: debug-latest
+          name: "Aegis — debug build (latest)"
+          body: |
+            Automated debug build of **Aegis**.
+
+            - Commit: `${{ github.sha }}`
+            - Built by: [run #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            Download `app-debug.apk` below and sideload it on your device.
+          prerelease: true
+          files: app/build/outputs/apk/debug/app-debug.apk
