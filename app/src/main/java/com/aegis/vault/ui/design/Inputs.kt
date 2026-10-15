@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActionScope
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
@@ -236,6 +237,11 @@ fun AegisTextField(
     enabled: Boolean = true,
     textStyle: TextStyle = AegisType.body,
 ) {
+    // Null handlers keep the platform defaults (Next/Previous move focus,
+    // Done closes the keyboard). A no-op override used to swallow them.
+    val imeHandler: (KeyboardActionScope.() -> Unit)? = onImeAction?.let { action -> { action() } }
+    val imeActions = KeyboardActions(onNext = imeHandler, onDone = imeHandler, onGo = imeHandler)
+
     Column(modifier.fillMaxWidth()) {
         if (label != null) {
             AText(label, style = AegisType.label, modifier = Modifier.padding(start = 2.dp, bottom = 6.dp))
@@ -267,11 +273,7 @@ fun AegisTextField(
                     maxLines = maxLines,
                     visualTransformation = visualTransformation,
                     keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
-                    keyboardActions = KeyboardActions(
-                        onNext = { onImeAction?.invoke() },
-                        onDone = { onImeAction?.invoke() },
-                        onGo = { onImeAction?.invoke() },
-                    ),
+                    keyboardActions = imeActions,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

@@ -280,7 +280,6 @@ fun UnlockScreen(vm: AppViewModel, activity: FragmentActivity) {
     var error by remember { mutableStateOf(false) }
     var showForgot by remember { mutableStateOf(false) }
     val bioReady = remember { vm.biometricReady() }
-    val count = remember { vm.itemCountHint() }
 
     fun attempt() {
         if (password.isEmpty()) return
@@ -316,11 +315,7 @@ fun UnlockScreen(vm: AppViewModel, activity: FragmentActivity) {
         AText("Welcome back", style = AegisType.title2, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
         AText(
-            if (count > 0) {
-                "Enter your master password — $count items on this device."
-            } else {
-                "Enter your master password to unlock your vault."
-            },
+            "Enter your master password to unlock your vault.",
             style = AegisType.body.copy(color = AegisColors.inkSecondary),
             textAlign = TextAlign.Center,
         )

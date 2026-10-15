@@ -111,7 +111,7 @@ fun CategoryScreen(vm: AppViewModel, nav: Navigator, screen: Screen.Category) {
             .fillMaxSize()
             .statusBarsPadding()
             .navigationBarsPadding()
-            .padding(bottom = 96.dp)
+            .padding(bottom = 148.dp)
     ) {
         NavHeader(
             title = title,

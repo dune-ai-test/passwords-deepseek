@@ -339,7 +339,7 @@ fun IconBadge(
 fun ItemBadge(item: VaultItem, size: Dp = 40.dp) {
     when (item) {
         is LoginItem -> {
-            val brand = Brands.forDomain(item.website.ifBlank { item.title })
+            val brand = Brands.forItem(item.title, item.website)
             if (brand != null) {
                 AvatarBadge(brand.letter, brand.color, size = size, corner = size * 0.3f)
             } else {
@@ -611,7 +611,7 @@ fun EmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(36.dp))
-        IconBadge(icon, AegisColors.blueSoft, AegisColors.blue, size = 64.dp, corner = 20.dp, iconSize = 30.dp)
+        IconBadge(icon, AegisColors.blueSoft, AegisColors.blue, size = 56.dp, corner = 18.dp, iconSize = 26.dp)
         Spacer(Modifier.height(18.dp))
         AText(title, style = AegisType.title2.copy(fontSize = 20.sp), textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
@@ -650,6 +650,7 @@ fun ToggleRow(
         Row(
             Modifier
                 .fillMaxWidth()
+                .pressable { onCheckedChange(!checked) }
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

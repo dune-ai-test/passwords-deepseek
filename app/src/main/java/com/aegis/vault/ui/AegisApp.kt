@@ -219,7 +219,7 @@ private fun AegisDock(
                     spotColor = Color(0x1F0B1B3A),
                 )
                 .clip(RoundedCornerShape(29.dp))
-                .background(Color(0xF2FFFFFF))
+                .background(Color(0xFFFFFFFF))
                 .padding(horizontal = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

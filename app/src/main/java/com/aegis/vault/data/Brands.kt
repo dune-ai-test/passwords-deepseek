@@ -77,7 +77,6 @@ object Brands {
         "signal.org" to Brand("S", Color(0xFF3A76F0)),
         "snapchat.com" to Brand("S", Color(0xFFF7D600)),
         "tiktok.com" to Brand("T", Color(0xFF111111)),
-        "spotify.com" to Brand("S", Color(0xFF1DB954)),
         "stackoverflow.com" to Brand("S", Color(0xFFF48024)),
         "atlassian.com" to Brand("A", Color(0xFF0052CC)),
         "cloudflare.com" to Brand("C", Color(0xFFF38020)),
@@ -109,6 +108,22 @@ object Brands {
         } else {
             null
         }
+    }
+
+    /**
+     * Badge for an item: prefers the website, then falls back to a known
+     * brand keyword inside the title (e.g. "Spotify" or "My Netflix login").
+     */
+    fun forItem(title: String, website: String): Brand? {
+        forDomain(website)?.let { return it }
+        val candidate = title.trim().lowercase()
+        if (candidate.isBlank()) return null
+        return known.entries.firstOrNull { (domain, _) ->
+            val keyword = domain.substringBefore('.')
+            keyword.length >= 4 &&
+                Regex("(^|[^a-z0-9])" + Regex.escape(keyword) + "([^a-z0-9]|$)")
+                    .containsMatchIn(candidate)
+        }?.value
     }
 
     private fun palette(seed: String): Color {

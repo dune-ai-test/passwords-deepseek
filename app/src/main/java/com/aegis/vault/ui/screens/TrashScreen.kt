@@ -50,13 +50,14 @@ fun TrashScreen(vm: AppViewModel, nav: Navigator) {
     val vaultState by vm.vault.collectAsStateWithLifecycle()
     val items = vaultState?.trashedItems ?: emptyList()
     var confirmEmpty by remember { mutableStateOf(false) }
+    var pendingDelete by remember { mutableStateOf<VaultItem?>(null) }
 
     Column(
         Modifier
             .fillMaxSize()
             .statusBarsPadding()
             .navigationBarsPadding()
-            .padding(bottom = 96.dp)
+            .padding(bottom = 148.dp)
     ) {
         NavHeader(
             title = "Trash",
@@ -95,12 +96,27 @@ fun TrashScreen(vm: AppViewModel, nav: Navigator) {
                     TrashRow(
                         item = item,
                         onRestore = { vm.restore(item.id) },
-                        onDelete = { vm.deleteForever(item.id) },
+                        onDelete = { pendingDelete = item },
                     )
                 }
                 Spacer(Modifier.height(20.dp))
             }
         }
+    }
+
+    val victim = pendingDelete
+    if (victim != null) {
+        ConfirmDialog(
+            title = "Delete forever?",
+            message = "\"${victim.title.ifBlank { "Untitled" }}\" will be permanently deleted. This can't be undone.",
+            confirmLabel = "Delete forever",
+            destructive = true,
+            onConfirm = {
+                pendingDelete = null
+                vm.deleteForever(victim.id)
+            },
+            onDismiss = { pendingDelete = null },
+        )
     }
 
     if (confirmEmpty) {

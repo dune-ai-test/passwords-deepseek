@@ -273,7 +273,7 @@ fun EditItemScreen(vm: AppViewModel, nav: Navigator, screen: Screen.Edit) {
                             }
                         },
                     )
-                    if (password.isBlank() && suggestion.isNotBlank()) {
+                    if (suggestion.isNotBlank() && password != suggestion) {
                         AegisCard(padding = 14.dp) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 IconBadge(

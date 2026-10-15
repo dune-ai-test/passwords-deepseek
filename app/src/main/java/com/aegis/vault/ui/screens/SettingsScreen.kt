@@ -51,6 +51,7 @@ fun SettingsScreen(vm: AppViewModel, nav: Navigator, activity: FragmentActivity)
     val vaultState by vm.vault.collectAsStateWithLifecycle()
     val data = vaultState ?: return
     val settings = data.settings
+    val vaultBytes by vm.vaultBytes.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var sheet by remember { mutableStateOf<SettingsSheet?>(null) }
@@ -81,9 +82,7 @@ fun SettingsScreen(vm: AppViewModel, nav: Navigator, activity: FragmentActivity)
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .statusBarsPadding()
-            .padding(bottom = 132.dp)
     ) {
         Row(
             Modifier
@@ -95,147 +94,154 @@ fun SettingsScreen(vm: AppViewModel, nav: Navigator, activity: FragmentActivity)
             AvatarBadge("A", AegisColors.violet, size = 40.dp, corner = 20.dp)
         }
 
-        AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 16.dp) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                AvatarBadge("A", AegisColors.violet, size = 48.dp, corner = 24.dp)
-                Spacer(Modifier.width(14.dp))
-                Column {
-                    AText("Local profile", style = AegisType.rowTitle)
-                    AText(
-                        "No account needed — your data stays on this device",
-                        style = AegisType.small,
-                        modifier = Modifier.padding(top = 2.dp),
+        Column(
+            Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 148.dp)
+        ) {
+            AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 16.dp) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    AvatarBadge("A", AegisColors.violet, size = 48.dp, corner = 24.dp)
+                    Spacer(Modifier.width(14.dp))
+                    Column {
+                        AText("Local profile", style = AegisType.rowTitle)
+                        AText(
+                            "No account needed — your data stays on this device",
+                            style = AegisType.small,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
+            AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
+                SettingsRow(
+                    icon = R.drawable.ic_clock,
+                    title = "Auto-lock",
+                    value = Fmt.autoLockLabel(settings.autoLockMinutes),
+                    onClick = { sheet = SettingsSheet.AUTOLOCK },
+                )
+                SettingsRow(
+                    icon = R.drawable.ic_scan_face,
+                    title = "Biometric unlock",
+                    subtitle = if (vm.canUseBiometrics()) null else "No biometrics enrolled on this device",
+                    trailing = {
+                        IOSSwitch(
+                            checked = settings.biometricEnabled,
+                            onCheckedChange = { checked ->
+                                if (checked) vm.enableBiometric(activity) { } else vm.disableBiometric()
+                            },
+                        )
+                    },
+                )
+                SettingsRow(
+                    icon = R.drawable.ic_lock,
+                    title = "Master password",
+                    subtitle = "Change it regularly",
+                    onClick = { sheet = SettingsSheet.MASTER },
+                )
+                SettingsRow(
+                    icon = R.drawable.ic_eye_off,
+                    title = "Screenshot protection",
+                    subtitle = "Hide contents in the app switcher",
+                    trailing = {
+                        IOSSwitch(
+                            checked = settings.screenshotProtection,
+                            onCheckedChange = { enabled ->
+                                vm.updateSettings { it.copy(screenshotProtection = enabled) }
+                            },
+                        )
+                    },
+                    divider = autofillSupported,
+                )
+                if (autofillSupported) {
+                    SettingsRow(
+                        icon = R.drawable.ic_pencil,
+                        title = "Autofill",
+                        value = if (autofillOn) "On" else "Off",
+                        onClick = {
+                            try {
+                                context.startActivity(Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE))
+                            } catch (e: Exception) {
+                                vm.toast("Autofill settings aren't available here")
+                            }
+                        },
+                        divider = false,
                     )
                 }
             }
-        }
 
-        Spacer(Modifier.height(20.dp))
-        AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
-            SettingsRow(
-                icon = R.drawable.ic_clock,
-                title = "Auto-lock",
-                value = Fmt.autoLockLabel(settings.autoLockMinutes),
-                onClick = { sheet = SettingsSheet.AUTOLOCK },
-            )
-            SettingsRow(
-                icon = R.drawable.ic_scan_face,
-                title = "Biometric unlock",
-                subtitle = if (vm.canUseBiometrics()) null else "No biometrics enrolled on this device",
-                trailing = {
-                    IOSSwitch(
-                        checked = settings.biometricEnabled,
-                        onCheckedChange = { checked ->
-                            if (checked) vm.enableBiometric(activity) { } else vm.disableBiometric()
-                        },
-                    )
-                },
-            )
-            SettingsRow(
-                icon = R.drawable.ic_lock,
-                title = "Master password",
-                subtitle = "Change it regularly",
-                onClick = { sheet = SettingsSheet.MASTER },
-            )
-            SettingsRow(
-                icon = R.drawable.ic_eye_off,
-                title = "Screenshot protection",
-                subtitle = "Hide contents in the app switcher",
-                trailing = {
-                    IOSSwitch(
-                        checked = settings.screenshotProtection,
-                        onCheckedChange = { enabled ->
-                            vm.updateSettings { it.copy(screenshotProtection = enabled) }
-                        },
-                    )
-                },
-                divider = autofillSupported,
-            )
-            if (autofillSupported) {
+            Spacer(Modifier.height(20.dp))
+            AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
                 SettingsRow(
-                    icon = R.drawable.ic_pencil,
-                    title = "Autofill",
-                    value = if (autofillOn) "On" else "Off",
-                    onClick = {
-                        try {
-                            context.startActivity(Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE))
-                        } catch (e: Exception) {
-                            vm.toast("Autofill settings aren't available here")
-                        }
-                    },
+                    icon = R.drawable.ic_share_2,
+                    title = "Export to file",
+                    subtitle = "Save an encrypted backup",
+                    onClick = { launchExport() },
+                )
+                SettingsRow(
+                    icon = R.drawable.ic_clock,
+                    title = "Local backup",
+                    value = settings.lastBackupAt?.let { Fmt.relativeTime(it) } ?: "Never",
+                    onClick = { sheet = SettingsSheet.BACKUP },
+                )
+                SettingsRow(
+                    icon = R.drawable.ic_hard_drive,
+                    title = "Storage",
+                    subtitle = "This device · encrypted",
+                    value = Fmt.formatBytes(vaultBytes),
+                )
+                SettingsRow(
+                    icon = R.drawable.ic_trash_2,
+                    title = "Trash",
+                    subtitle = if (data.trashedItems.isEmpty()) "Empty" else "${data.trashedItems.size} ${if (data.trashedItems.size == 1) "item" else "items"}",
+                    onClick = { nav.push(Screen.Trash) },
                     divider = false,
                 )
             }
-        }
 
-        Spacer(Modifier.height(20.dp))
-        AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
-            SettingsRow(
-                icon = R.drawable.ic_share_2,
-                title = "Export to file",
-                subtitle = "Save an encrypted backup",
-                onClick = { launchExport() },
-            )
-            SettingsRow(
-                icon = R.drawable.ic_clock,
-                title = "Local backup",
-                value = settings.lastBackupAt?.let { Fmt.relativeTime(it) } ?: "Never",
-                onClick = { sheet = SettingsSheet.BACKUP },
-            )
-            SettingsRow(
-                icon = R.drawable.ic_hard_drive,
-                title = "Storage",
-                subtitle = "This device · encrypted",
-                value = Fmt.formatBytes(vm.vaultSizeBytes()),
-            )
-            SettingsRow(
-                icon = R.drawable.ic_trash_2,
-                title = "Trash",
-                subtitle = if (data.trashedItems.isEmpty()) "Empty" else "${data.trashedItems.size} ${if (data.trashedItems.size == 1) "item" else "items"}",
-                onClick = { nav.push(Screen.Trash) },
-                divider = false,
-            )
-        }
+            Spacer(Modifier.height(20.dp))
+            AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
+                SettingsRow(
+                    icon = R.drawable.ic_bell,
+                    title = "Help & support",
+                    onClick = { sheet = SettingsSheet.HELP },
+                )
+                SettingsRow(
+                    icon = R.drawable.ic_shield_check,
+                    title = "About Aegis",
+                    value = "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                    onClick = { sheet = SettingsSheet.ABOUT },
+                    onLongClick = { nav.push(Screen.DevGallery) },
+                    divider = false,
+                )
+            }
 
-        Spacer(Modifier.height(20.dp))
-        AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
-            SettingsRow(
-                icon = R.drawable.ic_bell,
-                title = "Help & support",
-                onClick = { sheet = SettingsSheet.HELP },
-            )
-            SettingsRow(
-                icon = R.drawable.ic_shield_check,
-                title = "About Aegis",
-                value = "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                onClick = { sheet = SettingsSheet.ABOUT },
-                onLongClick = { nav.push(Screen.DevGallery) },
-                divider = false,
-            )
-        }
+            Spacer(Modifier.height(20.dp))
+            AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
+                SettingsRow(
+                    icon = R.drawable.ic_trash_2,
+                    title = "Erase vault",
+                    subtitle = "Delete everything from this device",
+                    destructive = true,
+                    onClick = { confirmErase = true },
+                    divider = false,
+                )
+            }
 
-        Spacer(Modifier.height(20.dp))
-        AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
-            SettingsRow(
-                icon = R.drawable.ic_trash_2,
-                title = "Erase vault",
-                subtitle = "Delete everything from this device",
-                destructive = true,
-                onClick = { confirmErase = true },
-                divider = false,
+            Spacer(Modifier.height(16.dp))
+            AText(
+                "Aegis ${BuildConfig.VERSION_NAME} · Built with OpenCode CLI and DeepSeek V4.1 Flash",
+                style = AegisType.caption,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
             )
+            Spacer(Modifier.height(28.dp))
         }
-
-        Spacer(Modifier.height(16.dp))
-        AText(
-            "Aegis ${BuildConfig.VERSION_NAME} · Built with OpenCode CLI and DeepSeek V4.1 Flash",
-            style = AegisType.caption,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp),
-        )
-        Spacer(Modifier.height(28.dp))
     }
 
     when (sheet) {

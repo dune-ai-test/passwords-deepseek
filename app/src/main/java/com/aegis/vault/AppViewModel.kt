@@ -46,6 +46,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val _vault = MutableStateFlow<VaultData?>(null)
     val vault: StateFlow<VaultData?> = _vault.asStateFlow()
 
+    /** On-disk size, refreshed after every write so the UI never shows stale bytes. */
+    private val _vaultBytes = MutableStateFlow(repo.vaultSizeBytes())
+    val vaultBytes: StateFlow<Long> = _vaultBytes.asStateFlow()
+
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
@@ -61,6 +65,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private var lastInteraction = System.currentTimeMillis()
     private var backgroundedAt: Long? = null
+
+    /** True while a system biometric prompt is up — auto-lock pauses then. */
+    private var systemPromptActive = false
+
+    private fun refreshVaultBytes() {
+        _vaultBytes.value = repo.vaultSizeBytes()
+    }
 
     /* ── Queries ──────────────────────────────────────────────────────────── */
 
@@ -105,6 +116,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _busy.value = true
             val data = repo.create(password.toCharArray())
             _vault.value = data
+            refreshVaultBytes()
             lastInteraction = System.currentTimeMillis()
             _stage.value = Stage.UNLOCKED
             _busy.value = false
@@ -121,6 +133,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _busy.value = false
             if (data != null) {
                 _vault.value = data
+                refreshVaultBytes()
                 lastInteraction = System.currentTimeMillis()
                 _stage.value = Stage.UNLOCKED
                 onResult(true)
@@ -148,6 +161,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun wipeVault() {
         viewModelScope.launch {
             repo.wipeEverything()
+            refreshVaultBytes()
             BiometricKeys.delete()
             _vault.value = null
             _stage.value = Stage.FIRST_RUN
@@ -174,12 +188,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             onResult(false)
             return
         }
+        beginSystemPrompt()
         Biometric.authenticate(
             activity = activity,
             cipher = cipher,
             title = "Unlock Aegis",
             subtitle = "Confirm your identity to open your vault",
             onSuccess = { authed ->
+                endSystemPrompt()
                 val key = try {
                     authed.doFinal(ciphertext)
                 } catch (e: Exception) {
@@ -193,6 +209,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     val data = repo.unlockWithKey(key)
                     if (data != null) {
                         _vault.value = data
+                        refreshVaultBytes()
                         lastInteraction = System.currentTimeMillis()
                         _stage.value = Stage.UNLOCKED
                         onResult(true)
@@ -201,7 +218,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
             },
-            onFailure = { onResult(false) },
+            onFailure = {
+                endSystemPrompt()
+                onResult(false)
+            },
         )
     }
 
@@ -231,6 +251,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             onDone(false)
             return
         }
+        beginSystemPrompt()
         Biometric.authenticate(
             activity = activity,
             cipher = cipher,
@@ -238,6 +259,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             subtitle = "Verify your identity to link this device",
             negativeText = "Cancel",
             onSuccess = { authed ->
+                endSystemPrompt()
                 viewModelScope.launch {
                     val ok = try {
                         val ciphertext = authed.doFinal(key)
@@ -251,7 +273,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     onDone(ok)
                 }
             },
-            onFailure = { onDone(false) },
+            onFailure = {
+                endSystemPrompt()
+                onDone(false)
+            },
         )
     }
 
@@ -364,10 +389,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val updated = current.copy(settings = transform(current.settings))
         _vault.value = updated
         repo.persist(updated)
+        refreshVaultBytes()
     }
 
     private fun persist(data: VaultData) {
-        viewModelScope.launch { repo.persist(data) }
+        viewModelScope.launch {
+            repo.persist(data)
+            refreshVaultBytes()
+        }
     }
 
     /* ── Master password ──────────────────────────────────────────────────── */
@@ -378,6 +407,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _busy.value = true
             val result = repo.changeMasterPassword(current.toCharArray(), next.toCharArray())
             _busy.value = false
+            refreshVaultBytes()
             when (result) {
                 VaultRepository.PasswordChangeResult.SUCCESS -> {
                     toast("Master password updated")
@@ -439,6 +469,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 onResult("Wrong password for this backup — or the file is damaged")
             } else {
                 _vault.value = data
+                refreshVaultBytes()
                 _stage.value = Stage.UNLOCKED
                 toast("Backup restored")
                 onResult(null)
@@ -490,6 +521,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         lastInteraction = System.currentTimeMillis()
     }
 
+    /** Called around system biometric prompts so auto-lock doesn't fire mid-prompt. */
+    fun beginSystemPrompt() {
+        systemPromptActive = true
+        noteInteraction()
+    }
+
+    fun endSystemPrompt() {
+        systemPromptActive = false
+        noteInteraction()
+    }
+
     fun onBackground() {
         backgroundedAt = System.currentTimeMillis()
         lastInteraction = System.currentTimeMillis()
@@ -509,6 +551,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun tick() {
         if (_stage.value != Stage.UNLOCKED) return
+        if (systemPromptActive) return
         val minutes = _vault.value?.settings?.autoLockMinutes ?: return
         if (minutes < 0) return
         if (System.currentTimeMillis() - lastInteraction > minutes * 60_000L) {

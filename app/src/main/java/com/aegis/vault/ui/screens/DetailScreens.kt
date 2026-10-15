@@ -60,6 +60,7 @@ import com.aegis.vault.ui.design.AegisLinkText
 import com.aegis.vault.ui.design.AegisType
 import com.aegis.vault.ui.design.AText
 import com.aegis.vault.ui.design.ActionRow
+import com.aegis.vault.ui.design.ConfirmDialog
 import com.aegis.vault.ui.design.InfoNote
 import com.aegis.vault.ui.design.ItemBadge
 import com.aegis.vault.ui.design.NavHeader
@@ -177,6 +178,7 @@ private fun LoginDetail(vm: AppViewModel, nav: Navigator, item: LoginItem) {
     val context = LocalContext.current
     var revealed by remember { mutableStateOf(false) }
     var historyOpen by remember { mutableStateOf(false) }
+    var confirmShare by remember { mutableStateOf(false) }
     val chevronRotation by animateFloatAsState(
         targetValue = if (historyOpen) 180f else 0f,
         label = "historyChevron",
@@ -185,10 +187,8 @@ private fun LoginDetail(vm: AppViewModel, nav: Navigator, item: LoginItem) {
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .statusBarsPadding()
             .navigationBarsPadding()
-            .padding(bottom = 40.dp)
     ) {
         NavHeader(
             onBack = { nav.pop() },
@@ -196,164 +196,183 @@ private fun LoginDetail(vm: AppViewModel, nav: Navigator, item: LoginItem) {
                 AegisLinkText("Edit", onClick = { nav.push(Screen.Edit(item.id)) })
             },
         )
-        HeroRow(item)
 
-        Spacer(Modifier.height(14.dp))
-        AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
-            DetailField(
-                label = "Username",
-                value = item.username,
-                trailing = {
-                    FieldIconButton(R.drawable.ic_copy) {
-                        vm.copyToClipboard(item.username)
-                    }
-                },
-            )
-            AegisDivider(startPadding = 16.dp)
-            DetailField(
-                label = "Password",
-                value = if (revealed) {
-                    item.password
-                } else {
-                    "•".repeat(item.password.length.coerceIn(6, 20))
-                },
-                trailing = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        FieldIconButton(
-                            icon = if (revealed) R.drawable.ic_eye_off else R.drawable.ic_eye,
-                            tint = AegisColors.inkSecondary,
-                        ) { revealed = !revealed }
-                        FieldIconButton(R.drawable.ic_copy) {
-                            vm.copyToClipboard(item.password, sensitive = true)
-                        }
-                    }
-                },
-            )
-            AegisDivider(startPadding = 16.dp)
-            DetailField(
-                label = "Website",
-                value = item.website,
-                trailing = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (item.website.isNotBlank()) {
-                            FieldIconButton(R.drawable.ic_globe) {
-                                openUrl(context, item.website)
-                            }
-                        }
-                        FieldIconButton(R.drawable.ic_copy) {
-                            vm.copyToClipboard(item.website)
-                        }
-                    }
-                },
-            )
-            AegisDivider(startPadding = 16.dp)
-            DetailField(
-                label = "Last changed",
-                value = Fmt.relativeTime(item.updatedAt),
-            )
-            if (item.notes.isNotBlank()) {
-                AegisDivider(startPadding = 16.dp)
-                DetailField(label = "Notes", value = item.notes)
-            }
-            if (item.tags.isNotEmpty()) {
-                AegisDivider(startPadding = 16.dp)
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    item.tags.forEach { tag -> TagChip(tag) }
-                }
-            }
-        }
+        Column(
+            Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 148.dp)
+        ) {
+            HeroRow(item)
 
-        if (item.password.isNotBlank()) {
-            Spacer(Modifier.height(16.dp))
-            AegisButton(
-                text = "Copy password",
-                onClick = { vm.copyToClipboard(item.password, sensitive = true) },
-                icon = R.drawable.ic_copy,
-                modifier = Modifier.padding(horizontal = 20.dp),
-            )
-        }
-
-        Spacer(Modifier.height(14.dp))
-        AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
-            ActionRow(
-                icon = R.drawable.ic_share_2,
-                label = "Share login",
-                onClick = {
-                    val body = buildString {
-                        appendLine("Username: ${item.username}")
-                        appendLine("Password: ${item.password}")
-                        if (item.website.isNotBlank()) appendLine("Website: ${item.website}")
-                    }.trim()
-                    shareText(context, item.title, body)
-                },
-            )
-            AegisDivider(startPadding = 62.dp)
-            TrashActionRow("Move to trash") {
-                vm.moveToTrash(item.id)
-                nav.pop()
-            }
-        }
-
-        if (item.history.isNotEmpty()) {
             Spacer(Modifier.height(14.dp))
             AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .pressable(scaleDown = 0.99f) { historyOpen = !historyOpen }
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    AText("Password history", style = AegisType.rowTitle, modifier = Modifier.weight(1f))
-                    AegisIcon(
-                        R.drawable.ic_chevron_down,
-                        size = 16.dp,
-                        tint = AegisColors.inkTertiary,
-                        modifier = Modifier.graphicsLayer { rotationZ = chevronRotation },
-                    )
-                }
-                AnimatedVisibility(visible = historyOpen) {
-                    Column {
-                        item.history.forEachIndexed { index, entry ->
-                            AegisDivider(startPadding = 16.dp)
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column(Modifier.weight(1f)) {
-                                    AText(
-                                        if (index == 0) "Previous" else "Older",
-                                        style = AegisType.smallSemibold.copy(color = AegisColors.ink),
-                                    )
-                                    AText(
-                                        "•".repeat(entry.value.length.coerceIn(8, 16)),
-                                        style = AegisType.body,
-                                        modifier = Modifier.padding(top = 2.dp),
-                                    )
+                DetailField(
+                    label = "Username",
+                    value = item.username,
+                    trailing = {
+                        FieldIconButton(R.drawable.ic_copy) {
+                            vm.copyToClipboard(item.username)
+                        }
+                    },
+                )
+                AegisDivider(startPadding = 16.dp)
+                DetailField(
+                    label = "Password",
+                    value = if (revealed) {
+                        item.password
+                    } else {
+                        "•".repeat(item.password.length.coerceIn(6, 20))
+                    },
+                    trailing = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            FieldIconButton(
+                                icon = if (revealed) R.drawable.ic_eye_off else R.drawable.ic_eye,
+                                tint = AegisColors.inkSecondary,
+                            ) { revealed = !revealed }
+                            FieldIconButton(R.drawable.ic_copy) {
+                                vm.copyToClipboard(item.password, sensitive = true)
+                            }
+                        }
+                    },
+                )
+                AegisDivider(startPadding = 16.dp)
+                DetailField(
+                    label = "Website",
+                    value = item.website,
+                    trailing = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (item.website.isNotBlank()) {
+                                FieldIconButton(R.drawable.ic_globe) {
+                                    openUrl(context, item.website)
                                 }
-                                AText(
-                                    Fmt.relativeTime(entry.changedAt),
-                                    style = AegisType.small,
-                                    modifier = Modifier.padding(end = 10.dp),
-                                )
-                                FieldIconButton(R.drawable.ic_copy) {
-                                    vm.copyToClipboard(entry.value, sensitive = true)
+                            }
+                            FieldIconButton(R.drawable.ic_copy) {
+                                vm.copyToClipboard(item.website)
+                            }
+                        }
+                    },
+                )
+                AegisDivider(startPadding = 16.dp)
+                DetailField(
+                    label = "Last changed",
+                    value = Fmt.relativeTime(item.updatedAt),
+                )
+                if (item.notes.isNotBlank()) {
+                    AegisDivider(startPadding = 16.dp)
+                    DetailField(label = "Notes", value = item.notes)
+                }
+                if (item.tags.isNotEmpty()) {
+                    AegisDivider(startPadding = 16.dp)
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        item.tags.forEach { tag -> TagChip(tag) }
+                    }
+                }
+            }
+
+            if (item.password.isNotBlank()) {
+                Spacer(Modifier.height(16.dp))
+                AegisButton(
+                    text = "Copy password",
+                    onClick = { vm.copyToClipboard(item.password, sensitive = true) },
+                    icon = R.drawable.ic_copy,
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                )
+            }
+
+            Spacer(Modifier.height(14.dp))
+            AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
+                ActionRow(
+                    icon = R.drawable.ic_share_2,
+                    label = "Share login",
+                    onClick = { confirmShare = true },
+                )
+                AegisDivider(startPadding = 62.dp)
+                TrashActionRow("Move to trash") {
+                    vm.moveToTrash(item.id)
+                    nav.pop()
+                }
+            }
+
+            if (item.history.isNotEmpty()) {
+                Spacer(Modifier.height(14.dp))
+                AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .pressable(scaleDown = 0.99f) { historyOpen = !historyOpen }
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        AText("Password history", style = AegisType.rowTitle, modifier = Modifier.weight(1f))
+                        AegisIcon(
+                            R.drawable.ic_chevron_down,
+                            size = 16.dp,
+                            tint = AegisColors.inkTertiary,
+                            modifier = Modifier.graphicsLayer { rotationZ = chevronRotation },
+                        )
+                    }
+                    AnimatedVisibility(visible = historyOpen) {
+                        Column {
+                            item.history.forEachIndexed { index, entry ->
+                                AegisDivider(startPadding = 16.dp)
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        AText(
+                                            if (index == 0) "Previous" else "Older",
+                                            style = AegisType.smallSemibold.copy(color = AegisColors.ink),
+                                        )
+                                        AText(
+                                            "•".repeat(entry.value.length.coerceIn(8, 16)),
+                                            style = AegisType.body,
+                                            modifier = Modifier.padding(top = 2.dp),
+                                        )
+                                    }
+                                    AText(
+                                        Fmt.relativeTime(entry.changedAt),
+                                        style = AegisType.small,
+                                        modifier = Modifier.padding(end = 10.dp),
+                                    )
+                                    FieldIconButton(R.drawable.ic_copy) {
+                                        vm.copyToClipboard(entry.value, sensitive = true)
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-        }
 
-        Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+
+    if (confirmShare) {
+        ConfirmDialog(
+            title = "Share password?",
+            message = "The shared text will include your password in plain text. Only share it with apps and people you trust.",
+            confirmLabel = "Share anyway",
+            onConfirm = {
+                confirmShare = false
+                val body = buildString {
+                    appendLine("Username: ${item.username}")
+                    appendLine("Password: ${item.password}")
+                    if (item.website.isNotBlank()) appendLine("Website: ${item.website}")
+                }.trim()
+                shareText(context, item.title, body)
+            },
+            onDismiss = { confirmShare = false },
+        )
     }
 }
 
@@ -365,6 +384,7 @@ private fun LoginDetail(vm: AppViewModel, nav: Navigator, item: LoginItem) {
 private fun CardDetail(vm: AppViewModel, nav: Navigator, item: CardItem) {
     val context = LocalContext.current
     var revealed by remember { mutableStateOf(false) }
+    var confirmShare by remember { mutableStateOf(false) }
 
     val brand = Brands.cardBrand(item.number)
     val digits = item.number.filter { it.isDigit() }
@@ -378,10 +398,8 @@ private fun CardDetail(vm: AppViewModel, nav: Navigator, item: CardItem) {
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .statusBarsPadding()
             .navigationBarsPadding()
-            .padding(bottom = 40.dp)
     ) {
         NavHeader(
             onBack = { nav.pop() },
@@ -389,152 +407,171 @@ private fun CardDetail(vm: AppViewModel, nav: Navigator, item: CardItem) {
                 AegisLinkText("Edit", onClick = { nav.push(Screen.Edit(item.id)) })
             },
         )
-        HeroRow(item)
 
-        Spacer(Modifier.height(14.dp))
-        Box(
+        Column(
             Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .height(196.dp)
-                .shadow(
-                    elevation = 18.dp,
-                    shape = RoundedCornerShape(22.dp),
-                    clip = false,
-                    ambientColor = Color(0x33000000),
-                    spotColor = Color(0x33000000),
-                )
-                .clip(RoundedCornerShape(22.dp))
-                .background(
-                    Brush.linearGradient(
-                        listOf(brand.color, brand.color.darken(0.35f))
-                    )
-                )
-                .pressable(scaleDown = 0.99f) { revealed = !revealed }
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 148.dp)
         ) {
-            Column(
+            HeroRow(item)
+
+            Spacer(Modifier.height(14.dp))
+            Box(
                 Modifier
-                    .fillMaxSize()
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.SpaceBetween,
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .height(196.dp)
+                    .shadow(
+                        elevation = 18.dp,
+                        shape = RoundedCornerShape(22.dp),
+                        clip = false,
+                        ambientColor = Color(0x33000000),
+                        spotColor = Color(0x33000000),
+                    )
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(brand.color, brand.color.darken(0.35f))
+                        )
+                    )
+                    .pressable(scaleDown = 0.99f) { revealed = !revealed }
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AText(
+                            "AEGIS",
+                            style = AegisType.label.copy(
+                                color = Color.White.copy(alpha = 0.75f),
+                                letterSpacing = 1.5.sp,
+                            ),
+                        )
+                        Spacer(Modifier.weight(1f))
+                        AText(
+                            brand.name,
+                            style = AegisType.rowTitle.copy(
+                                color = Color.White.copy(alpha = 0.95f),
+                                letterSpacing = 0.5.sp,
+                            ),
+                        )
+                    }
                     AText(
-                        "AEGIS",
-                        style = AegisType.label.copy(
-                            color = Color.White.copy(alpha = 0.75f),
-                            letterSpacing = 1.5.sp,
-                        ),
+                        if (revealed) full else masked,
+                        style = AegisType.big.copy(color = Color.White, letterSpacing = 2.sp),
+                        maxLines = 1,
                     )
-                    Spacer(Modifier.weight(1f))
-                    AText(
-                        brand.name,
-                        style = AegisType.rowTitle.copy(
-                            color = Color.White.copy(alpha = 0.95f),
-                            letterSpacing = 0.5.sp,
-                        ),
-                    )
+                    Row {
+                        Column(Modifier.weight(1f)) {
+                            AText(
+                                "CARDHOLDER",
+                                style = AegisType.caption.copy(
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    letterSpacing = 1.sp,
+                                ),
+                            )
+                            AText(
+                                item.cardholder.ifBlank { "—" }.uppercase(),
+                                style = AegisType.rowTitle.copy(color = Color.White),
+                                maxLines = 1,
+                            )
+                        }
+                        Column {
+                            AText(
+                                "EXPIRES",
+                                style = AegisType.caption.copy(
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    letterSpacing = 1.sp,
+                                ),
+                            )
+                            AText(
+                                item.expiry.ifBlank { "••/••" },
+                                style = AegisType.rowTitle.copy(color = Color.White),
+                            )
+                        }
+                    }
                 }
-                AText(
-                    if (revealed) full else masked,
-                    style = AegisType.big.copy(color = Color.White, letterSpacing = 2.sp),
-                    maxLines = 1,
+            }
+
+            Spacer(Modifier.height(16.dp))
+            AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
+                DetailField(
+                    label = "Card number",
+                    value = if (revealed) full else masked,
+                    trailing = {
+                        FieldIconButton(R.drawable.ic_copy) {
+                            vm.copyToClipboard(digits, sensitive = true)
+                        }
+                    },
                 )
-                Row {
-                    Column(Modifier.weight(1f)) {
-                        AText(
-                            "CARDHOLDER",
-                            style = AegisType.caption.copy(
-                                color = Color.White.copy(alpha = 0.7f),
-                                letterSpacing = 1.sp,
-                            ),
-                        )
-                        AText(
-                            item.cardholder.ifBlank { "—" }.uppercase(),
-                            style = AegisType.rowTitle.copy(color = Color.White),
-                            maxLines = 1,
-                        )
-                    }
-                    Column {
-                        AText(
-                            "EXPIRES",
-                            style = AegisType.caption.copy(
-                                color = Color.White.copy(alpha = 0.7f),
-                                letterSpacing = 1.sp,
-                            ),
-                        )
-                        AText(
-                            item.expiry.ifBlank { "••/••" },
-                            style = AegisType.rowTitle.copy(color = Color.White),
-                        )
-                    }
+                AegisDivider(startPadding = 16.dp)
+                DetailField(
+                    label = "Security code",
+                    value = if (revealed) item.securityCode else "•••",
+                    trailing = {
+                        FieldIconButton(R.drawable.ic_copy) {
+                            vm.copyToClipboard(item.securityCode, sensitive = true)
+                        }
+                    },
+                )
+                AegisDivider(startPadding = 16.dp)
+                DetailField(label = "Expires", value = item.expiry)
+                if (item.billingAddress.isNotBlank()) {
+                    AegisDivider(startPadding = 16.dp)
+                    DetailField(label = "Billing address", value = item.billingAddress)
+                }
+                if (item.notes.isNotBlank()) {
+                    AegisDivider(startPadding = 16.dp)
+                    DetailField(label = "Notes", value = item.notes)
                 }
             }
-        }
 
-        Spacer(Modifier.height(16.dp))
-        AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
-            DetailField(
-                label = "Card number",
-                value = if (revealed) full else masked,
-                trailing = {
-                    FieldIconButton(R.drawable.ic_copy) {
-                        vm.copyToClipboard(digits, sensitive = true)
-                    }
-                },
+            Spacer(Modifier.height(16.dp))
+            AegisButton(
+                text = "Copy card number",
+                onClick = { vm.copyToClipboard(digits, sensitive = true) },
+                icon = R.drawable.ic_copy,
+                modifier = Modifier.padding(horizontal = 20.dp),
             )
-            AegisDivider(startPadding = 16.dp)
-            DetailField(
-                label = "Security code",
-                value = if (revealed) item.securityCode else "•••",
-                trailing = {
-                    FieldIconButton(R.drawable.ic_copy) {
-                        vm.copyToClipboard(item.securityCode, sensitive = true)
-                    }
-                },
-            )
-            AegisDivider(startPadding = 16.dp)
-            DetailField(label = "Expires", value = item.expiry)
-            if (item.billingAddress.isNotBlank()) {
-                AegisDivider(startPadding = 16.dp)
-                DetailField(label = "Billing address", value = item.billingAddress)
-            }
-            if (item.notes.isNotBlank()) {
-                AegisDivider(startPadding = 16.dp)
-                DetailField(label = "Notes", value = item.notes)
-            }
-        }
 
-        Spacer(Modifier.height(16.dp))
-        AegisButton(
-            text = "Copy card number",
-            onClick = { vm.copyToClipboard(digits, sensitive = true) },
-            icon = R.drawable.ic_copy,
-            modifier = Modifier.padding(horizontal = 20.dp),
+            Spacer(Modifier.height(14.dp))
+            AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
+                ActionRow(
+                    icon = R.drawable.ic_share_2,
+                    label = "Share card details",
+                    onClick = { confirmShare = true },
+                )
+                AegisDivider(startPadding = 62.dp)
+                TrashActionRow("Move to trash") {
+                    vm.moveToTrash(item.id)
+                    nav.pop()
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+
+    if (confirmShare) {
+        ConfirmDialog(
+            title = "Share card details?",
+            message = "The shared file will include your full card number in plain text. Only share it with people you trust.",
+            confirmLabel = "Share anyway",
+            onConfirm = {
+                confirmShare = false
+                val text = buildString {
+                    appendLine("Card: ${item.title}")
+                    appendLine("Number: $full")
+                    if (item.expiry.isNotBlank()) appendLine("Expires: ${item.expiry}")
+                    if (item.cardholder.isNotBlank()) appendLine("Cardholder: ${item.cardholder}")
+                }.trim()
+                shareTextFile(context, safeFileName(item.title) + ".txt", "text/plain", text)
+            },
+            onDismiss = { confirmShare = false },
         )
-
-        Spacer(Modifier.height(14.dp))
-        AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
-            ActionRow(
-                icon = R.drawable.ic_share_2,
-                label = "Share card details",
-                onClick = {
-                    val text = buildString {
-                        appendLine("Card: ${item.title}")
-                        appendLine("Number: $full")
-                        if (item.expiry.isNotBlank()) appendLine("Expires: ${item.expiry}")
-                        if (item.cardholder.isNotBlank()) appendLine("Cardholder: ${item.cardholder}")
-                    }.trim()
-                    shareTextFile(context, safeFileName(item.title) + ".txt", "text/plain", text)
-                },
-            )
-            AegisDivider(startPadding = 62.dp)
-            TrashActionRow("Move to trash") {
-                vm.moveToTrash(item.id)
-                nav.pop()
-            }
-        }
-        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -554,10 +591,8 @@ private fun NoteDetail(vm: AppViewModel, nav: Navigator, item: NoteItem) {
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .statusBarsPadding()
             .navigationBarsPadding()
-            .padding(bottom = 40.dp)
     ) {
         NavHeader(
             onBack = { nav.pop() },
@@ -565,61 +600,69 @@ private fun NoteDetail(vm: AppViewModel, nav: Navigator, item: NoteItem) {
                 AegisLinkText("Edit", onClick = { nav.push(Screen.Edit(item.id)) })
             },
         )
-        HeroRow(item)
 
-        if (item.tags.isNotEmpty()) {
-            Spacer(Modifier.height(10.dp))
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                item.tags.forEach { tag -> TagChip(tag) }
+        Column(
+            Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 148.dp)
+        ) {
+            HeroRow(item)
+
+            if (item.tags.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    item.tags.forEach { tag -> TagChip(tag) }
+                }
             }
-        }
 
-        Spacer(Modifier.height(14.dp))
-        AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 18.dp) {
-            SelectionContainer {
-                AText(
-                    text = item.body.ifBlank { "No content yet." },
-                    style = AegisType.body.copy(lineHeight = 24.sp),
-                )
-            }
-        }
-
-        if (item.notes.isNotBlank()) {
             Spacer(Modifier.height(14.dp))
-            AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 16.dp) {
-                AText("Notes", style = AegisType.label)
-                Spacer(Modifier.height(6.dp))
-                AText(item.notes, style = AegisType.body)
+            AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 18.dp) {
+                SelectionContainer {
+                    AText(
+                        text = item.body.ifBlank { "No content yet." },
+                        style = AegisType.body.copy(lineHeight = 24.sp),
+                    )
+                }
             }
-        }
 
-        Spacer(Modifier.height(16.dp))
-        AegisButton(
-            text = "Copy note",
-            onClick = { vm.copyToClipboard(item.body) },
-            icon = R.drawable.ic_copy,
-            modifier = Modifier.padding(horizontal = 20.dp),
-        )
+            if (item.notes.isNotBlank()) {
+                Spacer(Modifier.height(14.dp))
+                AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 16.dp) {
+                    AText("Notes", style = AegisType.label)
+                    Spacer(Modifier.height(6.dp))
+                    AText(item.notes, style = AegisType.body)
+                }
+            }
 
-        Spacer(Modifier.height(14.dp))
-        AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
-            ActionRow(
-                icon = R.drawable.ic_file_text,
-                label = "Export to file",
-                onClick = { exportLauncher.launch(safeFileName(item.title) + ".txt") },
+            Spacer(Modifier.height(16.dp))
+            AegisButton(
+                text = "Copy note",
+                onClick = { vm.copyToClipboard(item.body) },
+                icon = R.drawable.ic_copy,
+                modifier = Modifier.padding(horizontal = 20.dp),
             )
-            AegisDivider(startPadding = 62.dp)
-            TrashActionRow("Move to trash") {
-                vm.moveToTrash(item.id)
-                nav.pop()
+
+            Spacer(Modifier.height(14.dp))
+            AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
+                ActionRow(
+                    icon = R.drawable.ic_file_text,
+                    label = "Export to file",
+                    onClick = { exportLauncher.launch(safeFileName(item.title) + ".txt") },
+                )
+                AegisDivider(startPadding = 62.dp)
+                TrashActionRow("Move to trash") {
+                    vm.moveToTrash(item.id)
+                    nav.pop()
+                }
             }
+            Spacer(Modifier.height(24.dp))
         }
-        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -634,10 +677,8 @@ private fun IdentityDetail(vm: AppViewModel, nav: Navigator, item: IdentityItem)
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .statusBarsPadding()
             .navigationBarsPadding()
-            .padding(bottom = 40.dp)
     ) {
         NavHeader(
             onBack = { nav.pop() },
@@ -645,68 +686,57 @@ private fun IdentityDetail(vm: AppViewModel, nav: Navigator, item: IdentityItem)
                 AegisLinkText("Edit", onClick = { nav.push(Screen.Edit(item.id)) })
             },
         )
-        HeroRow(item)
 
-        Spacer(Modifier.height(14.dp))
-        AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
-            DetailField(
-                label = "Full name",
-                value = item.fullName,
-                trailing = {
-                    FieldIconButton(R.drawable.ic_copy) {
-                        vm.copyToClipboard(item.fullName)
-                    }
-                },
-            )
-            AegisDivider(startPadding = 16.dp)
-            DetailField(
-                label = "Email",
-                value = item.email,
-                trailing = {
-                    FieldIconButton(R.drawable.ic_copy) {
-                        vm.copyToClipboard(item.email)
-                    }
-                },
-            )
-            AegisDivider(startPadding = 16.dp)
-            DetailField(
-                label = "Phone",
-                value = item.phone,
-                trailing = {
-                    FieldIconButton(R.drawable.ic_copy) {
-                        vm.copyToClipboard(item.phone)
-                    }
-                },
-            )
-            AegisDivider(startPadding = 16.dp)
-            DetailField(label = "Address", value = item.address)
-            if (item.notes.isNotBlank()) {
+        Column(
+            Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 148.dp)
+        ) {
+            HeroRow(item)
+
+            Spacer(Modifier.height(14.dp))
+            AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
+                DetailField(
+                    label = "Full name",
+                    value = item.fullName,
+                    trailing = {
+                        FieldIconButton(R.drawable.ic_copy) {
+                            vm.copyToClipboard(item.fullName)
+                        }
+                    },
+                )
                 AegisDivider(startPadding = 16.dp)
-                DetailField(label = "Notes", value = item.notes)
+                DetailField(
+                    label = "Email",
+                    value = item.email,
+                    trailing = {
+                        FieldIconButton(R.drawable.ic_copy) {
+                            vm.copyToClipboard(item.email)
+                        }
+                    },
+                )
+                AegisDivider(startPadding = 16.dp)
+                DetailField(
+                    label = "Phone",
+                    value = item.phone,
+                    trailing = {
+                        FieldIconButton(R.drawable.ic_copy) {
+                            vm.copyToClipboard(item.phone)
+                        }
+                    },
+                )
+                AegisDivider(startPadding = 16.dp)
+                DetailField(label = "Address", value = item.address)
+                if (item.notes.isNotBlank()) {
+                    AegisDivider(startPadding = 16.dp)
+                    DetailField(label = "Notes", value = item.notes)
+                }
             }
-        }
 
-        Spacer(Modifier.height(16.dp))
-        AegisButton(
-            text = "Copy all details",
-            onClick = {
-                val text = buildString {
-                    if (item.fullName.isNotBlank()) appendLine("Name: ${item.fullName}")
-                    if (item.email.isNotBlank()) appendLine("Email: ${item.email}")
-                    if (item.phone.isNotBlank()) appendLine("Phone: ${item.phone}")
-                    if (item.address.isNotBlank()) appendLine("Address: ${item.address}")
-                }.trim()
-                vm.copyToClipboard(text)
-            },
-            icon = R.drawable.ic_copy,
-            modifier = Modifier.padding(horizontal = 20.dp),
-        )
-
-        Spacer(Modifier.height(14.dp))
-        AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
-            ActionRow(
-                icon = R.drawable.ic_share_2,
-                label = "Share identity",
+            Spacer(Modifier.height(16.dp))
+            AegisButton(
+                text = "Copy all details",
                 onClick = {
                     val text = buildString {
                         if (item.fullName.isNotBlank()) appendLine("Name: ${item.fullName}")
@@ -714,22 +744,41 @@ private fun IdentityDetail(vm: AppViewModel, nav: Navigator, item: IdentityItem)
                         if (item.phone.isNotBlank()) appendLine("Phone: ${item.phone}")
                         if (item.address.isNotBlank()) appendLine("Address: ${item.address}")
                     }.trim()
-                    shareText(context, item.title, text)
+                    vm.copyToClipboard(text)
                 },
+                icon = R.drawable.ic_copy,
+                modifier = Modifier.padding(horizontal = 20.dp),
             )
-            AegisDivider(startPadding = 62.dp)
-            TrashActionRow("Move to trash") {
-                vm.moveToTrash(item.id)
-                nav.pop()
-            }
-        }
 
-        Spacer(Modifier.height(14.dp))
-        InfoNote(
-            "Stored only on this device. Aegis never uploads identity details anywhere.",
-            icon = R.drawable.ic_lock,
-            modifier = Modifier.padding(horizontal = 20.dp),
-        )
-        Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(14.dp))
+            AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
+                ActionRow(
+                    icon = R.drawable.ic_share_2,
+                    label = "Share identity",
+                    onClick = {
+                        val text = buildString {
+                            if (item.fullName.isNotBlank()) appendLine("Name: ${item.fullName}")
+                            if (item.email.isNotBlank()) appendLine("Email: ${item.email}")
+                            if (item.phone.isNotBlank()) appendLine("Phone: ${item.phone}")
+                            if (item.address.isNotBlank()) appendLine("Address: ${item.address}")
+                        }.trim()
+                        shareText(context, item.title, text)
+                    },
+                )
+                AegisDivider(startPadding = 62.dp)
+                TrashActionRow("Move to trash") {
+                    vm.moveToTrash(item.id)
+                    nav.pop()
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+            InfoNote(
+                "Stored only on this device. Aegis never uploads identity details anywhere.",
+                icon = R.drawable.ic_lock,
+                modifier = Modifier.padding(horizontal = 20.dp),
+            )
+            Spacer(Modifier.height(24.dp))
+        }
     }
 }

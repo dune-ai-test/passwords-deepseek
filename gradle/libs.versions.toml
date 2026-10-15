@@ -7,6 +7,7 @@ lifecycle = "2.8.7"
 composeBom = "2024.12.01"
 serialization = "1.7.3"
 biometric = "1.1.0"
+fragment = "1.8.5"
 junit = "4.13.2"
 
 [libraries]
@@ -22,6 +23,7 @@ compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
 androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
+androidx-fragment = { group = "androidx.fragment", name = "fragment", version.ref = "fragment" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]

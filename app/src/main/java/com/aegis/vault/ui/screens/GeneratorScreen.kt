@@ -77,9 +77,7 @@ fun GeneratorScreen(vm: AppViewModel, nav: Navigator) {
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .statusBarsPadding()
-            .padding(bottom = 128.dp)
     ) {
         Row(
             Modifier
@@ -93,107 +91,114 @@ fun GeneratorScreen(vm: AppViewModel, nav: Navigator) {
             RoundIconButton(R.drawable.ic_copy) { vm.copyToClipboard(password) }
         }
 
-        AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 18.dp) {
-            AText(
-                password.ifEmpty { "…" },
-                style = AegisType.big.copy(letterSpacing = 0.5.sp),
-            )
+        Column(
+            Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 148.dp)
+        ) {
+            AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 18.dp) {
+                AText(
+                    password.ifEmpty { "…" },
+                    style = AegisType.big.copy(letterSpacing = 0.5.sp),
+                )
+                Spacer(Modifier.height(16.dp))
+                StrengthMeter(PasswordTools.estimate(password))
+            }
+
             Spacer(Modifier.height(16.dp))
-            StrengthMeter(PasswordTools.estimate(password))
-        }
+            SegmentedControl(
+                selectedIndex = mode,
+                options = listOf("Random", "Memorable"),
+                onSelect = { mode = it },
+                modifier = Modifier.padding(horizontal = 20.dp),
+            )
 
-        Spacer(Modifier.height(16.dp))
-        SegmentedControl(
-            selectedIndex = mode,
-            options = listOf("Random", "Memorable"),
-            onSelect = { mode = it },
-            modifier = Modifier.padding(horizontal = 20.dp),
-        )
-
-        Spacer(Modifier.height(16.dp))
-        AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
-            if (mode == 0) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    AText("Length", style = AegisType.rowTitle, modifier = Modifier.weight(1f))
-                    AegisStepper(
-                        value = "$length",
-                        onMinus = { length = (length - 1).coerceAtLeast(8) },
-                        onPlus = { length = (length + 1).coerceAtMost(64) },
-                        minusEnabled = length > 8,
-                        plusEnabled = length < 64,
+            Spacer(Modifier.height(16.dp))
+            AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
+                if (mode == 0) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        AText("Length", style = AegisType.rowTitle, modifier = Modifier.weight(1f))
+                        AegisStepper(
+                            value = "$length",
+                            onMinus = { length = (length - 1).coerceAtLeast(8) },
+                            onPlus = { length = (length + 1).coerceAtMost(64) },
+                            minusEnabled = length > 8,
+                            plusEnabled = length < 64,
+                        )
+                    }
+                    AegisSlider(
+                        value = length.toFloat(),
+                        onValueChange = { length = it.roundToInt() },
+                        valueRange = 8f..64f,
+                        modifier = Modifier.padding(horizontal = 16.dp),
                     )
-                }
-                AegisSlider(
-                    value = length.toFloat(),
-                    onValueChange = { length = it.roundToInt() },
-                    valueRange = 8f..64f,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
-                Spacer(Modifier.height(6.dp))
-                ToggleRow(title = "Uppercase letters", checked = upper, onCheckedChange = { upper = it })
-                ToggleRow(title = "Lowercase letters", checked = lower, onCheckedChange = { lower = it })
-                ToggleRow(title = "Numbers", checked = digits, onCheckedChange = { digits = it })
-                ToggleRow(title = "Symbols", checked = symbols, onCheckedChange = { symbols = it })
-                ToggleRow(
-                    title = "Avoid look-alikes",
-                    checked = avoidLookalikes,
-                    onCheckedChange = { avoidLookalikes = it },
-                    subtitle = "Excludes i, l, 1, O and 0",
-                    divider = false,
-                )
-            } else {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    AText("Words", style = AegisType.rowTitle, modifier = Modifier.weight(1f))
-                    AegisStepper(
-                        value = "$words",
-                        onMinus = { words = (words - 1).coerceAtLeast(2) },
-                        onPlus = { words = (words + 1).coerceAtMost(6) },
-                        minusEnabled = words > 2,
-                        plusEnabled = words < 6,
+                    Spacer(Modifier.height(6.dp))
+                    ToggleRow(title = "Uppercase letters", checked = upper, onCheckedChange = { upper = it })
+                    ToggleRow(title = "Lowercase letters", checked = lower, onCheckedChange = { lower = it })
+                    ToggleRow(title = "Numbers", checked = digits, onCheckedChange = { digits = it })
+                    ToggleRow(title = "Symbols", checked = symbols, onCheckedChange = { symbols = it })
+                    ToggleRow(
+                        title = "Avoid look-alikes",
+                        checked = avoidLookalikes,
+                        onCheckedChange = { avoidLookalikes = it },
+                        subtitle = "Excludes i, l, 1, O and 0",
+                        divider = false,
                     )
-                }
-                ToggleRow(title = "Capitalise words", checked = capitalize, onCheckedChange = { capitalize = it })
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    AText("Separator", style = AegisType.rowTitle, modifier = Modifier.weight(1f))
-                    listOf("-", "space", ".").forEachIndexed { index, label ->
-                        AegisFilterChip(label = label, selected = separatorIndex == index, onClick = { separatorIndex = index })
+                } else {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        AText("Words", style = AegisType.rowTitle, modifier = Modifier.weight(1f))
+                        AegisStepper(
+                            value = "$words",
+                            onMinus = { words = (words - 1).coerceAtLeast(2) },
+                            onPlus = { words = (words + 1).coerceAtMost(6) },
+                            minusEnabled = words > 2,
+                            plusEnabled = words < 6,
+                        )
+                    }
+                    ToggleRow(title = "Capitalise words", checked = capitalize, onCheckedChange = { capitalize = it })
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        AText("Separator", style = AegisType.rowTitle, modifier = Modifier.weight(1f))
+                        listOf("-", "space", ".").forEachIndexed { index, label ->
+                            AegisFilterChip(label = label, selected = separatorIndex == index, onClick = { separatorIndex = index })
+                        }
                     }
                 }
             }
-        }
 
-        Spacer(Modifier.height(18.dp))
-        AegisButton(
-            text = "Generate new password",
-            onClick = { regenerate() },
-            icon = R.drawable.ic_refresh_cw,
-            modifier = Modifier.padding(horizontal = 20.dp),
-        )
-        Spacer(Modifier.height(12.dp))
-        AText(
-            "Generated on this device with a cryptographically secure RNG.",
-            style = AegisType.caption,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 32.dp),
-        )
-        Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(18.dp))
+            AegisButton(
+                text = "Generate new password",
+                onClick = { regenerate() },
+                icon = R.drawable.ic_refresh_cw,
+                modifier = Modifier.padding(horizontal = 20.dp),
+            )
+            Spacer(Modifier.height(12.dp))
+            AText(
+                "Generated on this device with a cryptographically secure RNG.",
+                style = AegisType.caption,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp),
+            )
+            Spacer(Modifier.height(28.dp))
+        }
     }
 }
 

@@ -26,7 +26,7 @@ jobs:
           java-version: '17'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: '8.10.2'
 
@@ -37,7 +37,7 @@ jobs:
         run: gradle assembleDebug --stacktrace
 
       - name: Publish pre-release with APK
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: debug-latest
           name: "Aegis — debug build (latest)"

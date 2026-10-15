@@ -27,6 +27,10 @@ captures/
 *.jks
 *.keystore
 keystore.properties
+# Exception: the debug signing key is committed on purpose (public throwaway
+# key, "android" password) so CI APKs are consistently signed — see the
+# signingConfigs block in app/build.gradle.kts.
+!keystore/aegis-debug.p12
 
 # ── OS ───────────────────────────────────────────────────────────────────────
 .DS_Store

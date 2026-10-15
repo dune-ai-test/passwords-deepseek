@@ -87,7 +87,9 @@ fun ModalSheet(
                 .imePadding()
                 .navigationBarsPadding()
                 .padding(horizontal = 20.dp)
-                .padding(top = 10.dp, bottom = 22.dp)
+                // 78dp clears the floating dock's box (10+58+10) in MainShell,
+                // plus 10dp of breathing room, so nothing lands behind it.
+                .padding(top = 10.dp, bottom = 88.dp)
                 .heightIn(max = 660.dp)
                 .verticalScroll(rememberScrollState()),
         ) {

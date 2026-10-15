@@ -48,6 +48,7 @@ import com.aegis.vault.ui.design.pressable
 fun VaultScreen(vm: AppViewModel, nav: Navigator) {
     val vaultState by vm.vault.collectAsStateWithLifecycle()
     val audit by vm.audit.collectAsStateWithLifecycle()
+    val vaultBytes by vm.vaultBytes.collectAsStateWithLifecycle()
     val data = vaultState ?: return
 
     val items = data.activeItems
@@ -64,9 +65,7 @@ fun VaultScreen(vm: AppViewModel, nav: Navigator) {
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .statusBarsPadding()
-            .padding(bottom = 130.dp)
     ) {
         Row(
             Modifier
@@ -89,152 +88,159 @@ fun VaultScreen(vm: AppViewModel, nav: Navigator) {
         )
         Spacer(Modifier.height(14.dp))
 
-        AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 14.dp) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconBadge(
-                    R.drawable.ic_hard_drive,
-                    AegisColors.blueSoft,
-                    AegisColors.blue,
-                    size = 40.dp,
+        Column(
+            Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 148.dp)
+        ) {
+            AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 14.dp) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconBadge(
+                        R.drawable.ic_hard_drive,
+                        AegisColors.blueSoft,
+                        AegisColors.blue,
+                        size = 40.dp,
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        AText("Local-only vault", style = AegisType.rowTitle)
+                        AText(
+                            "${Fmt.formatBytes(vaultBytes)} on this device",
+                            style = AegisType.small,
+                            modifier = Modifier.padding(top = 1.dp),
+                        )
+                    }
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(AegisColors.greenSoft)
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        AText("Offline", style = AegisType.smallSemibold.copy(color = AegisColors.greenDeep))
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(18.dp))
+
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                CategoryTile(
+                    R.drawable.ic_key_round, AegisColors.blue, AegisColors.blueSoft,
+                    "Logins", logins, Modifier.weight(1f),
+                ) { nav.push(Screen.Category(CategoryMode.ALL, ItemType.LOGIN)) }
+                CategoryTile(
+                    R.drawable.ic_credit_card, AegisColors.orange, AegisColors.orangeSoft,
+                    "Cards", cards, Modifier.weight(1f),
+                ) { nav.push(Screen.Category(CategoryMode.ALL, ItemType.CARD)) }
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                CategoryTile(
+                    R.drawable.ic_file_text, AegisColors.violetDeep, AegisColors.violetSoft,
+                    "Notes", notes, Modifier.weight(1f),
+                ) { nav.push(Screen.Category(CategoryMode.ALL, ItemType.NOTE)) }
+                CategoryTile(
+                    R.drawable.ic_user, AegisColors.greenDeep, AegisColors.greenSoft,
+                    "Identities", identities, Modifier.weight(1f),
+                ) { nav.push(Screen.Category(CategoryMode.ALL, ItemType.IDENTITY)) }
+            }
+
+            if (recent.isNotEmpty()) {
+                Spacer(Modifier.height(24.dp))
+                SectionHeader(
+                    title = "Recently used",
+                    action = "See all",
+                    onAction = { nav.push(Screen.Category(CategoryMode.RECENT, ItemType.LOGIN)) },
+                    modifier = Modifier.padding(horizontal = 20.dp),
                 )
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    AText("Local-only vault", style = AegisType.rowTitle)
-                    AText(
-                        "${Fmt.formatBytes(vm.vaultSizeBytes())} on this device",
-                        style = AegisType.small,
-                        modifier = Modifier.padding(top = 1.dp),
-                    )
-                }
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(AegisColors.greenSoft)
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                Spacer(Modifier.height(12.dp))
+                Column(
+                    Modifier.padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    AText("Offline", style = AegisType.smallSemibold.copy(color = AegisColors.greenDeep))
+                    recent.forEach { item ->
+                        ItemRow(
+                            item = item,
+                            onClick = {
+                                vm.markUsed(item.id)
+                                nav.push(Screen.Detail(item.id))
+                            },
+                        )
+                    }
                 }
             }
-        }
 
-        Spacer(Modifier.height(18.dp))
-
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            CategoryTile(
-                R.drawable.ic_key_round, AegisColors.blue, AegisColors.blueSoft,
-                "Logins", logins, Modifier.weight(1f),
-            ) { nav.push(Screen.Category(CategoryMode.ALL, ItemType.LOGIN)) }
-            CategoryTile(
-                R.drawable.ic_credit_card, AegisColors.orange, AegisColors.orangeSoft,
-                "Cards", cards, Modifier.weight(1f),
-            ) { nav.push(Screen.Category(CategoryMode.ALL, ItemType.CARD)) }
-        }
-        Spacer(Modifier.height(12.dp))
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            CategoryTile(
-                R.drawable.ic_file_text, AegisColors.violetDeep, AegisColors.violetSoft,
-                "Notes", notes, Modifier.weight(1f),
-            ) { nav.push(Screen.Category(CategoryMode.ALL, ItemType.NOTE)) }
-            CategoryTile(
-                R.drawable.ic_user, AegisColors.greenDeep, AegisColors.greenSoft,
-                "Identities", identities, Modifier.weight(1f),
-            ) { nav.push(Screen.Category(CategoryMode.ALL, ItemType.IDENTITY)) }
-        }
-
-        if (recent.isNotEmpty()) {
-            Spacer(Modifier.height(24.dp))
-            SectionHeader(
-                title = "Recently used",
-                action = "See all",
-                onAction = { nav.push(Screen.Category(CategoryMode.RECENT, ItemType.LOGIN)) },
-                modifier = Modifier.padding(horizontal = 20.dp),
-            )
-            Spacer(Modifier.height(12.dp))
-            Column(
-                Modifier.padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                recent.forEach { item ->
-                    ItemRow(
-                        item = item,
-                        onClick = {
-                            vm.markUsed(item.id)
-                            nav.push(Screen.Detail(item.id))
-                        },
-                    )
+            if (a != null && (a.reuseGroups.isNotEmpty() || a.old.isNotEmpty() || a.weak.isNotEmpty())) {
+                Spacer(Modifier.height(24.dp))
+                SectionHeader(
+                    title = "Needs attention",
+                    action = "Fix all",
+                    onAction = { nav.switchTab(Screen.Security) },
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                )
+                Spacer(Modifier.height(12.dp))
+                Column(
+                    Modifier.padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (a.reuseGroups.isNotEmpty()) {
+                        val group = a.reuseGroups.first()
+                        AttentionRow(
+                            icon = R.drawable.ic_copy,
+                            tint = AegisColors.orange,
+                            bg = AegisColors.orangeSoft,
+                            title = "\"${group.password}\" reused",
+                            subtitle = "${group.items.size} accounts share it",
+                        ) { nav.push(Screen.Category(CategoryMode.REUSED, ItemType.LOGIN)) }
+                    }
+                    if (a.old.isNotEmpty()) {
+                        val oldest = a.old.minBy { it.updatedAt }
+                        val years = yearsSince(oldest.updatedAt)
+                        AttentionRow(
+                            icon = R.drawable.ic_clock,
+                            tint = AegisColors.violetDeep,
+                            bg = AegisColors.violetSoft,
+                            title = "Unchanged for $years ${if (years == 1L) "year" else "years"}",
+                            subtitle = listOfNotNull(
+                                oldest.title.takeIf { it.isNotBlank() },
+                                (oldest as? com.aegis.vault.data.LoginItem)?.username?.takeIf { it.isNotBlank() },
+                            ).joinToString(" · "),
+                        ) { nav.push(Screen.Category(CategoryMode.OLD, ItemType.LOGIN)) }
+                    }
+                    if (a.weak.isNotEmpty()) {
+                        val count = a.weak.size
+                        AttentionRow(
+                            icon = R.drawable.ic_triangle_alert,
+                            tint = AegisColors.red,
+                            bg = AegisColors.redSoft,
+                            title = "$count weak ${if (count == 1) "password" else "passwords"}",
+                            subtitle = "Easily guessed — update them soon",
+                        ) { nav.push(Screen.Category(CategoryMode.WEAK, ItemType.LOGIN)) }
+                    }
                 }
             }
-        }
 
-        if (a != null && (a.reuseGroups.isNotEmpty() || a.old.isNotEmpty() || a.weak.isNotEmpty())) {
-            Spacer(Modifier.height(24.dp))
-            SectionHeader(
-                title = "Needs attention",
-                action = "Fix all",
-                onAction = { nav.switchTab(Screen.Security) },
-                modifier = Modifier.padding(horizontal = 20.dp),
-            )
-            Spacer(Modifier.height(12.dp))
-            Column(
-                Modifier.padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (a.reuseGroups.isNotEmpty()) {
-                    val group = a.reuseGroups.first()
-                    AttentionRow(
-                        icon = R.drawable.ic_copy,
-                        tint = AegisColors.orange,
-                        bg = AegisColors.orangeSoft,
-                        title = "\"${group.password}\" reused",
-                        subtitle = "${group.items.size} accounts share it",
-                    ) { nav.push(Screen.Category(CategoryMode.REUSED, ItemType.LOGIN)) }
-                }
-                if (a.old.isNotEmpty()) {
-                    val oldest = a.old.minBy { it.updatedAt }
-                    val years = yearsSince(oldest.updatedAt)
-                    AttentionRow(
-                        icon = R.drawable.ic_clock,
-                        tint = AegisColors.violetDeep,
-                        bg = AegisColors.violetSoft,
-                        title = "Unchanged for $years ${if (years == 1L) "year" else "years"}",
-                        subtitle = listOfNotNull(
-                            oldest.title.takeIf { it.isNotBlank() },
-                            (oldest as? com.aegis.vault.data.LoginItem)?.username?.takeIf { it.isNotBlank() },
-                        ).joinToString(" · "),
-                    ) { nav.push(Screen.Category(CategoryMode.OLD, ItemType.LOGIN)) }
-                }
-                if (a.weak.isNotEmpty()) {
-                    val count = a.weak.size
-                    AttentionRow(
-                        icon = R.drawable.ic_triangle_alert,
-                        tint = AegisColors.red,
-                        bg = AegisColors.redSoft,
-                        title = "$count weak ${if (count == 1) "password" else "passwords"}",
-                        subtitle = "Easily guessed — update them soon",
-                    ) { nav.push(Screen.Category(CategoryMode.WEAK, ItemType.LOGIN)) }
-                }
+            if (items.isEmpty()) {
+                Spacer(Modifier.height(28.dp))
+                EmptyState(
+                    icon = R.drawable.ic_key_round,
+                    title = "Your vault is empty",
+                    message = "Tap the blue + button to add your first login, card or secure note.",
+                    cta = "Add a login",
+                    onCta = { nav.push(Screen.Edit(presetType = ItemType.LOGIN)) },
+                    footnote = "Everything stays encrypted on this device.",
+                )
             }
-        }
 
-        if (items.isEmpty()) {
             Spacer(Modifier.height(28.dp))
-            EmptyState(
-                icon = R.drawable.ic_key_round,
-                title = "Your vault is empty",
-                message = "Tap the blue + button to add your first login, card or secure note.",
-                cta = "Add a login",
-                onCta = { nav.push(Screen.Edit(presetType = ItemType.LOGIN)) },
-                footnote = "Everything stays encrypted on this device.",
-            )
         }
-
-        Spacer(Modifier.height(28.dp))
     }
 }
 

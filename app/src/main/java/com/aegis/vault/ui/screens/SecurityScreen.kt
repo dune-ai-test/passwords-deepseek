@@ -49,9 +49,7 @@ fun SecurityScreen(vm: AppViewModel, nav: Navigator) {
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .statusBarsPadding()
-            .padding(bottom = 132.dp)
     ) {
         Row(
             Modifier
@@ -70,175 +68,182 @@ fun SecurityScreen(vm: AppViewModel, nav: Navigator) {
             )
         }
 
-        AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 18.dp) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    AText("Security score", style = AegisType.label)
-                    Spacer(Modifier.height(6.dp))
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        AText("${a.score}", style = AegisType.score)
-                        Spacer(Modifier.width(10.dp))
-                        ScoreChip(a.scoreLabel, a.score)
+        Column(
+            Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 148.dp)
+        ) {
+            AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 18.dp) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        AText("Security score", style = AegisType.label)
+                        Spacer(Modifier.height(6.dp))
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            AText("${a.score}", style = AegisType.score)
+                            Spacer(Modifier.width(10.dp))
+                            ScoreChip(a.scoreLabel, a.score)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        AText(
+                            if (a.fixesNeeded == 0) {
+                                "No issues found — your vault looks great."
+                            } else {
+                                "${a.fixesNeeded} ${if (a.fixesNeeded == 1) "issue" else "issues"} could be improved."
+                            },
+                            style = AegisType.small,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        AText("Checked locally just now", style = AegisType.caption)
                     }
-                    Spacer(Modifier.height(8.dp))
-                    AText(
-                        if (a.fixesNeeded == 0) {
-                            "No issues found — your vault looks great."
-                        } else {
-                            "${a.fixesNeeded} ${if (a.fixesNeeded == 1) "issue" else "issues"} could be improved."
-                        },
-                        style = AegisType.small,
+                    Spacer(Modifier.width(14.dp))
+                    ProgressRing(
+                        progress = a.score / 100f,
+                        color = scoreColor(a.score),
+                        size = 74.dp,
+                        strokeWidth = 8.dp,
                     )
-                    Spacer(Modifier.height(2.dp))
-                    AText("Checked locally just now", style = AegisType.caption)
                 }
-                Spacer(Modifier.width(14.dp))
-                ProgressRing(
-                    progress = a.score / 100f,
-                    color = scoreColor(a.score),
-                    size = 74.dp,
-                    strokeWidth = 8.dp,
+            }
+
+            Spacer(Modifier.height(24.dp))
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                StatTile(
+                    count = a.weak.size,
+                    label = "Weak",
+                    icon = R.drawable.ic_triangle_alert,
+                    tint = AegisColors.orange,
+                    bg = AegisColors.orangeSoft,
+                    modifier = Modifier.weight(1f),
+                )
+                StatTile(
+                    count = a.reusedAccountCount,
+                    label = "Reused",
+                    icon = R.drawable.ic_copy,
+                    tint = AegisColors.red,
+                    bg = AegisColors.redSoft,
+                    modifier = Modifier.weight(1f),
                 )
             }
-        }
+            Spacer(Modifier.height(12.dp))
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                StatTile(
+                    count = a.old.size,
+                    label = "Old",
+                    icon = R.drawable.ic_clock,
+                    tint = AegisColors.violetDeep,
+                    bg = AegisColors.violetSoft,
+                    modifier = Modifier.weight(1f),
+                )
+                StatTile(
+                    count = a.strongCount,
+                    label = "Strong",
+                    icon = R.drawable.ic_shield_check,
+                    tint = AegisColors.greenDeep,
+                    bg = AegisColors.greenSoft,
+                    modifier = Modifier.weight(1f),
+                )
+            }
 
-        Spacer(Modifier.height(24.dp))
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            StatTile(
-                count = a.weak.size,
-                label = "Weak",
-                icon = R.drawable.ic_triangle_alert,
-                tint = AegisColors.orange,
-                bg = AegisColors.orangeSoft,
-                modifier = Modifier.weight(1f),
-            )
-            StatTile(
-                count = a.reusedAccountCount,
-                label = "Reused",
-                icon = R.drawable.ic_copy,
-                tint = AegisColors.red,
-                bg = AegisColors.redSoft,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Spacer(Modifier.height(12.dp))
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            StatTile(
-                count = a.old.size,
-                label = "Old",
-                icon = R.drawable.ic_clock,
-                tint = AegisColors.violetDeep,
-                bg = AegisColors.violetSoft,
-                modifier = Modifier.weight(1f),
-            )
-            StatTile(
-                count = a.strongCount,
-                label = "Strong",
-                icon = R.drawable.ic_shield_check,
-                tint = AegisColors.greenDeep,
-                bg = AegisColors.greenSoft,
-                modifier = Modifier.weight(1f),
-            )
-        }
+            if (a.reuseGroups.isNotEmpty()) {
+                Spacer(Modifier.height(24.dp))
+                val group = a.reuseGroups.first()
+                AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 16.dp) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconBadge(
+                            R.drawable.ic_copy,
+                            AegisColors.redSoft,
+                            AegisColors.red,
+                            size = 40.dp,
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            AText("Reuse detected", style = AegisType.rowTitle)
+                            AText(
+                                "\"${group.password}\" is shared by ${group.items.size} accounts",
+                                style = AegisType.small,
+                                modifier = Modifier.padding(top = 2.dp),
+                            )
+                        }
+                        SmallButton("Fix") {
+                            nav.push(Screen.Category(CategoryMode.REUSED, ItemType.LOGIN))
+                        }
+                    }
+                }
+            }
 
-        if (a.reuseGroups.isNotEmpty()) {
-            Spacer(Modifier.height(24.dp))
-            val group = a.reuseGroups.first()
-            AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 16.dp) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconBadge(
-                        R.drawable.ic_copy,
-                        AegisColors.redSoft,
-                        AegisColors.red,
-                        size = 40.dp,
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        AText("Reuse detected", style = AegisType.rowTitle)
-                        AText(
-                            "\"${group.password}\" is shared by ${group.items.size} accounts",
-                            style = AegisType.small,
-                            modifier = Modifier.padding(top = 2.dp),
+            if (a.weak.isNotEmpty()) {
+                Spacer(Modifier.height(24.dp))
+                SectionHeader(
+                    title = "Weak passwords",
+                    action = "Review",
+                    onAction = { nav.push(Screen.Category(CategoryMode.WEAK, ItemType.LOGIN)) },
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                )
+                Spacer(Modifier.height(12.dp))
+                Column(
+                    Modifier.padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    a.weak.take(5).forEach { item ->
+                        ItemRow(
+                            item = item,
+                            subtitle = "Password is too simple",
+                            onClick = { nav.push(Screen.Detail(item.id)) },
                         )
                     }
-                    SmallButton("Fix") {
-                        nav.push(Screen.Category(CategoryMode.REUSED, ItemType.LOGIN))
+                }
+            }
+
+            if (a.old.isNotEmpty()) {
+                Spacer(Modifier.height(24.dp))
+                SectionHeader(
+                    title = "Old passwords",
+                    action = "Review",
+                    onAction = { nav.push(Screen.Category(CategoryMode.OLD, ItemType.LOGIN)) },
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                )
+                Spacer(Modifier.height(12.dp))
+                Column(
+                    Modifier.padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    a.old.take(5).forEach { item ->
+                        ItemRow(
+                            item = item,
+                            subtitle = oldSubtitle(item.updatedAt),
+                            onClick = { nav.push(Screen.Detail(item.id)) },
+                        )
                     }
                 }
             }
-        }
 
-        if (a.weak.isNotEmpty()) {
-            Spacer(Modifier.height(24.dp))
-            SectionHeader(
-                title = "Weak passwords",
-                action = "Review",
-                onAction = { nav.push(Screen.Category(CategoryMode.WEAK, ItemType.LOGIN)) },
-                modifier = Modifier.padding(horizontal = 20.dp),
-            )
-            Spacer(Modifier.height(12.dp))
-            Column(
-                Modifier.padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                a.weak.take(5).forEach { item ->
-                    ItemRow(
-                        item = item,
-                        subtitle = "Password is too simple",
-                        onClick = { nav.push(Screen.Detail(item.id)) },
-                    )
-                }
+            if (a.fixesNeeded == 0) {
+                Spacer(Modifier.height(24.dp))
+                InfoNote(
+                    text = "All clear — no weak, reused or old passwords were found.",
+                    icon = R.drawable.ic_check,
+                    tint = AegisColors.greenDeep,
+                    bg = AegisColors.greenSoft,
+                    textColor = AegisColors.greenDeep,
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                )
             }
-        }
 
-        if (a.old.isNotEmpty()) {
-            Spacer(Modifier.height(24.dp))
-            SectionHeader(
-                title = "Old passwords",
-                action = "Review",
-                onAction = { nav.push(Screen.Category(CategoryMode.OLD, ItemType.LOGIN)) },
-                modifier = Modifier.padding(horizontal = 20.dp),
-            )
-            Spacer(Modifier.height(12.dp))
-            Column(
-                Modifier.padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                a.old.take(5).forEach { item ->
-                    ItemRow(
-                        item = item,
-                        subtitle = oldSubtitle(item.updatedAt),
-                        onClick = { nav.push(Screen.Detail(item.id)) },
-                    )
-                }
-            }
-        }
-
-        if (a.fixesNeeded == 0) {
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(14.dp))
             InfoNote(
-                text = "All clear — no weak, reused or old passwords were found.",
-                icon = R.drawable.ic_check,
-                tint = AegisColors.greenDeep,
-                bg = AegisColors.greenSoft,
-                textColor = AegisColors.greenDeep,
+                text = "The audit runs entirely on this device. Nothing is uploaded, ever.",
+                icon = R.drawable.ic_lock,
                 modifier = Modifier.padding(horizontal = 20.dp),
             )
+            Spacer(Modifier.height(28.dp))
         }
-
-        Spacer(Modifier.height(14.dp))
-        InfoNote(
-            text = "The audit runs entirely on this device. Nothing is uploaded, ever.",
-            icon = R.drawable.ic_lock,
-            modifier = Modifier.padding(horizontal = 20.dp),
-        )
-        Spacer(Modifier.height(28.dp))
     }
 }
 
