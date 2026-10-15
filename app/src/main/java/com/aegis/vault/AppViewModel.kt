@@ -281,7 +281,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val current = _vault.value ?: return
         val item = current.items.firstOrNull { it.id == id } ?: return
         val now = System.currentTimeMillis()
-        if (item.lastUsedAt != null && now - item.lastUsedAt < 60_000L) return
+        val last = item.lastUsedAt
+        if (last != null && now - last < 60_000L) return
         val touched = when (item) {
             is LoginItem -> item.copy(lastUsedAt = now)
             is CardItem -> item.copy(lastUsedAt = now)

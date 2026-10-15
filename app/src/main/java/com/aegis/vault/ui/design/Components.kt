@@ -2,6 +2,7 @@ package com.aegis.vault.ui.design
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -68,17 +69,18 @@ fun AText(
     overflow: TextOverflow = TextOverflow.Ellipsis,
     textAlign: TextAlign? = null,
 ) {
+    val base = if (color == Color.Unspecified) style else style.copy(color = color)
     BasicText(
         text = text,
         modifier = modifier,
-        style = if (textAlign != null) style.copy(textAlign = textAlign) else style,
+        style = if (textAlign != null) base.copy(textAlign = textAlign) else base,
         overflow = overflow,
         maxLines = maxLines,
-        color = color,
     )
 }
 
 /** iOS-style press feedback: subtle scale-down, no ripple. */
+@OptIn(ExperimentalFoundationApi::class)
 fun Modifier.pressable(
     enabled: Boolean = true,
     scaleDown: Float = 0.97f,
