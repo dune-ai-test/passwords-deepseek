@@ -127,6 +127,10 @@ fun SettingsScreen(vm: AppViewModel, nav: Navigator, activity: FragmentActivity)
                     icon = R.drawable.ic_scan_face,
                     title = "Biometric unlock",
                     subtitle = if (vm.canUseBiometrics()) null else "No biometrics enrolled on this device",
+                    onClick = {
+                        if (settings.biometricEnabled) vm.disableBiometric()
+                        else vm.enableBiometric(activity) { }
+                    },
                     trailing = {
                         IOSSwitch(
                             checked = settings.biometricEnabled,
@@ -146,6 +150,9 @@ fun SettingsScreen(vm: AppViewModel, nav: Navigator, activity: FragmentActivity)
                     icon = R.drawable.ic_eye_off,
                     title = "Screenshot protection",
                     subtitle = "Hide contents in the app switcher",
+                    onClick = {
+                        vm.updateSettings { it.copy(screenshotProtection = !settings.screenshotProtection) }
+                    },
                     trailing = {
                         IOSSwitch(
                             checked = settings.screenshotProtection,

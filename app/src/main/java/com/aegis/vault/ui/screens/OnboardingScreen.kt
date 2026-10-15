@@ -53,6 +53,7 @@ import com.aegis.vault.ui.design.IconBadge
 import com.aegis.vault.ui.design.InfoNote
 import com.aegis.vault.ui.design.NavHeader
 import com.aegis.vault.ui.design.StrengthMeter
+import com.aegis.vault.ui.design.pressable
 import kotlinx.coroutines.delay
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -236,7 +237,10 @@ fun CreateMasterScreen(vm: AppViewModel, activity: FragmentActivity, onBack: () 
             )
             Spacer(Modifier.height(18.dp))
             AegisCard(padding = 14.dp) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.pressable { biometric = !biometric },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     IconBadge(
                         R.drawable.ic_scan_face,
                         AegisColors.blueSoft,
