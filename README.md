@@ -32,6 +32,16 @@ The debug APK is built automatically by GitHub Actions and published to the
 The APK is refreshed on **every push to `main`** (rolling tag `debug-latest`),
 and can also be built on demand via **Actions → Build debug APK → Run workflow**.
 
+### Verify on device
+
+CI proves it compiles, passes the unit tests and packages; these flows need a real phone:
+
+- First run: create a master password → let it enable biometrics → reopen the app → unlock with face/fingerprint
+- Create one of each item type (login, card, note, identity), kill the app, reopen — auto-lock should have kicked in
+- Settings → Export to file, then restore from that `.aegis` file
+- Copy a password, paste it elsewhere, confirm the clipboard clears after ~60 s
+- Share a login / export a note — the Android share sheet and file picker should appear
+
 ## Building
 
 Everything is built in CI — no local toolchain is required:
@@ -51,6 +61,9 @@ gradle testDebugUnitTest
 gradle assembleDebug
 ```
 
+The JVM unit tests cover AES-GCM round-trips and tamper detection, PBKDF2
+determinism, vault-file serialization, generator guarantees and audit scoring.
+
 ## Architecture
 
 ```
@@ -59,14 +72,17 @@ app/src/main/java/com/aegis/vault/
 ├── data/     → models, encrypted vault repository, audit, generator, search
 ├── ui/design → custom design system (palette, type, components — no Material)
 ├── ui/screens→ all app screens
-└── MainActivity.kt
+├── AppViewModel.kt → app state, auto-lock, clipboard, export/import
+└── MainActivity.kt → single activity (FragmentActivity + Compose)
 ```
 
 - The vault is a single JSON document encrypted with AES-256-GCM. A random
   256-bit vault key is generated at creation; it is wrapped (encrypted) once
   with a key derived from your master password, and optionally once more with
   a hardware-backed Android Keystore key that requires biometric auth.
-- Changing the master password rotates the vault key and re-wraps everything.
+- Changing the master password re-wraps the same vault key with a new
+  password-derived key — your data is never re-encrypted, and the biometric
+  link stays valid.
 - Writes are atomic (temp file + rename), so a crash can't corrupt the vault.
 
 ## Design
