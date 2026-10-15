@@ -1,35 +1,42 @@
 package com.aegis.vault
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.text.BasicText
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.sp
+import androidx.activity.viewModels
+import androidx.fragment.app.FragmentActivity
+import com.aegis.vault.ui.AegisApp
 
-class MainActivity : ComponentActivity() {
+/**
+ * Single-activity host.
+ *
+ * FragmentActivity (not ComponentActivity) because the biometric prompt from
+ * androidx.biometric needs a FragmentActivity context.
+ */
+class MainActivity : FragmentActivity() {
+
+    private val vm: AppViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFFF2F2F7)),
-                contentAlignment = Alignment.Center
-            ) {
-                BasicText(
-                    text = "Aegis — build OK",
-                    style = TextStyle(fontSize = 20.sp, color = Color(0xFF1C1C1E))
-                )
-            }
+            AegisApp(vm, this)
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        vm.onForeground()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        vm.onBackground()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) vm.noteInteraction()
     }
 }
