@@ -5,6 +5,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -494,12 +495,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             toast("Copied — clears in 60 seconds")
             viewModelScope.launch {
                 delay(60_000)
-                try {
-                    val current = clipboard.primaryClip?.getItemAt(0)?.text?.toString()
-                    if (current == text) {
-                        clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
-                    }
+                // Android 10+ denies clipboard reads to background apps, so a null
+                // or failed read means either "nothing copied since" or "can't
+                // check" — clear either way. clearPrimaryClip() only succeeds while
+                // we still own the clip, so a newer user copy is never clobbered.
+                val current = try {
+                    clipboard.primaryClip?.getItemAt(0)?.text?.toString()
                 } catch (_: Exception) {
+                    null
+                }
+                if (current == null || current == text) {
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            clipboard.clearPrimaryClip()
+                        } else {
+                            clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
+                        }
+                    } catch (_: Exception) {
+                    }
                 }
             }
         } else {
