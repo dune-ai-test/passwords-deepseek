@@ -29,8 +29,9 @@ The debug APK is built automatically by GitHub Actions and published to the
 2. Download `app-debug.apk` from the latest *debug* pre-release
 3. Sideload it on your device (allow install from unknown sources for your browser/file manager)
 
-The APK is refreshed on **every push to `main`** (rolling tag `debug-latest`),
-and can also be built on demand via **Actions → Build debug APK → Run workflow**.
+Builds are **manual**: run **Actions → Build debug APK → Run workflow** to test
+and package the APK — it refreshes the rolling `debug-latest` pre-release.
+Pushing to `main` no longer triggers a build.
 
 ### Verify on device
 
@@ -44,7 +45,8 @@ CI proves it compiles, passes the unit tests and packages; these flows need a re
 
 ## Building
 
-Everything is built in CI — no local toolchain is required:
+Everything is built in CI — start a build from the Actions tab; no local
+toolchain is required:
 
 | Tool | Version |
 |---|---|
