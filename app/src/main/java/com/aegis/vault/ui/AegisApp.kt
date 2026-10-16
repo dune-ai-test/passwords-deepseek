@@ -60,6 +60,7 @@ import com.aegis.vault.ui.screens.SettingsScreen
 import com.aegis.vault.ui.screens.TrashScreen
 import com.aegis.vault.ui.screens.UnlockScreen
 import com.aegis.vault.ui.screens.VaultScreen
+import com.aegis.vault.ui.screens.fake.FakeVaultShell
 import kotlinx.coroutines.delay
 
 @Composable
@@ -69,9 +70,14 @@ fun AegisApp(vm: AppViewModel, activity: FragmentActivity) {
     val busy by vm.busy.collectAsStateWithLifecycle()
     val busyText by vm.busyText.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
+    val decoySettings by vm.decoySettings.collectAsStateWithLifecycle()
 
-    // Screenshot protection follows the setting (default: on).
-    val secure = vault?.settings?.screenshotProtection ?: true
+    // Screenshot protection follows the setting (default: on). While the
+    // decoy vault is open, its own in-memory toggle drives the flag.
+    val secure = when (stage) {
+        AppViewModel.Stage.DECOY -> decoySettings.screenshotProtection
+        else -> vault?.settings?.screenshotProtection ?: true
+    }
     LaunchedEffect(secure) {
         if (secure) {
             activity.window.setFlags(
@@ -83,9 +89,9 @@ fun AegisApp(vm: AppViewModel, activity: FragmentActivity) {
         }
     }
 
-    // Inactivity heartbeat while unlocked.
+    // Inactivity heartbeat while unlocked (also auto-locks the decoy).
     LaunchedEffect(stage) {
-        if (stage == AppViewModel.Stage.UNLOCKED) {
+        if (stage == AppViewModel.Stage.UNLOCKED || stage == AppViewModel.Stage.DECOY) {
             while (true) {
                 delay(5_000)
                 vm.tick()
@@ -98,6 +104,7 @@ fun AegisApp(vm: AppViewModel, activity: FragmentActivity) {
             AppViewModel.Stage.FIRST_RUN -> FirstRunFlow(vm, activity)
             AppViewModel.Stage.LOCKED -> UnlockScreen(vm, activity)
             AppViewModel.Stage.UNLOCKED -> MainShell(vm, activity)
+            AppViewModel.Stage.DECOY -> FakeVaultShell(vm)
         }
         MessageToast(
             message = message,
@@ -105,7 +112,11 @@ fun AegisApp(vm: AppViewModel, activity: FragmentActivity) {
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
-                .padding(bottom = if (stage == AppViewModel.Stage.UNLOCKED) 110.dp else 40.dp),
+                .padding(
+                    bottom = if (
+                        stage == AppViewModel.Stage.UNLOCKED || stage == AppViewModel.Stage.DECOY
+                    ) 110.dp else 40.dp
+                ),
         )
         BusyOverlay(visible = busy, text = busyText)
     }

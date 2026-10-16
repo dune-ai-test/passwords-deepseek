@@ -1,6 +1,9 @@
 # ── Design mockups (stay local, not published) ──────────────────────────────
 /ui/
 
+# ── Local notes (stay local, not published) ─────────────────────────────────
+/ideas.md
+
 # ── Gradle ───────────────────────────────────────────────────────────────────
 .gradle/
 build/

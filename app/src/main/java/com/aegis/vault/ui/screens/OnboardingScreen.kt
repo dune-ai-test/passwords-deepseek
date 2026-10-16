@@ -281,13 +281,14 @@ fun CreateMasterScreen(vm: AppViewModel, activity: FragmentActivity, onBack: () 
 @Composable
 fun UnlockScreen(vm: AppViewModel, activity: FragmentActivity) {
     var password by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf(false) }
     var showForgot by remember { mutableStateOf(false) }
     val bioReady = remember { vm.biometricReady() }
 
     fun attempt() {
         if (password.isEmpty()) return
-        vm.unlock(password) { ok -> if (!ok) error = true }
+        // A wrong password opens the decoy vault (routed in the VM) — there is
+        // deliberately no error feedback here.
+        vm.unlock(password) { }
     }
 
     LaunchedEffect(Unit) {
@@ -326,21 +327,10 @@ fun UnlockScreen(vm: AppViewModel, activity: FragmentActivity) {
         Spacer(Modifier.height(28.dp))
         AegisPasswordField(
             value = password,
-            onValueChange = {
-                password = it
-                error = false
-            },
+            onValueChange = { password = it },
             placeholder = "Master password",
             onImeAction = { attempt() },
         )
-        if (error) {
-            Spacer(Modifier.height(10.dp))
-            AText(
-                "Wrong master password — try again.",
-                style = AegisType.smallSemibold.copy(color = AegisColors.red),
-                modifier = Modifier.fillMaxWidth().padding(start = 4.dp),
-            )
-        }
         Spacer(Modifier.height(20.dp))
         AegisButton(
             text = "Unlock",

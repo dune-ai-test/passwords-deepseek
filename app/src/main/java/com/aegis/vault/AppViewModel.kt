@@ -35,7 +35,7 @@ import kotlinx.coroutines.withContext
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
 
-    enum class Stage { FIRST_RUN, LOCKED, UNLOCKED }
+    enum class Stage { FIRST_RUN, LOCKED, UNLOCKED, DECOY }
 
     private val repo = VaultRepository(app)
     private val wordlist = Wordlist(app)
@@ -117,6 +117,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _busy.value = true
             val data = repo.create(password.toCharArray())
             _vault.value = data
+            cacheSettings(data)
             refreshVaultBytes()
             lastInteraction = System.currentTimeMillis()
             _stage.value = Stage.UNLOCKED
@@ -134,17 +135,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _busy.value = false
             if (data != null) {
                 _vault.value = data
+                cacheSettings(data)
                 refreshVaultBytes()
                 lastInteraction = System.currentTimeMillis()
                 _stage.value = Stage.UNLOCKED
                 onResult(true)
             } else {
                 onResult(false)
+                // Wrong password: open the decoy vault instead of an error.
+                enterDecoy()
             }
         }
     }
 
     fun lock() {
+        cacheSettings(_vault.value)
         repo.lock()
         _vault.value = null
         _stage.value = if (repo.vaultExists()) Stage.LOCKED else Stage.FIRST_RUN
@@ -168,6 +173,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _stage.value = Stage.FIRST_RUN
             toast("Vault erased from this device")
         }
+    }
+
+    /* ── Decoy vault ──────────────────────────────────────────────────────── */
+
+    /** Settings shown by the decoy vault — in-memory only, never persisted. */
+    private val _decoySettings = MutableStateFlow(VaultSettings())
+    val decoySettings: StateFlow<VaultSettings> = _decoySettings.asStateFlow()
+
+    /** Last settings seen on the real vault, so the decoy opens looking identical. */
+    private var lastKnownSettings: VaultSettings? = null
+
+    private fun cacheSettings(data: VaultData?) {
+        data?.settings?.let { lastKnownSettings = it }
+    }
+
+    fun updateDecoySettings(transform: (VaultSettings) -> VaultSettings) {
+        _decoySettings.value = transform(_decoySettings.value)
+    }
+
+    /**
+     * Opens the decoy vault after a failed unlock attempt. The decoy renders
+     * demo content only (ui/screens/fake) and never reads or writes the
+     * on-disk vault, which stays locked underneath — entering the correct
+     * master password afterwards still opens the real vault.
+     */
+    private fun enterDecoy() {
+        _decoySettings.value = lastKnownSettings ?: VaultSettings()
+        lastInteraction = System.currentTimeMillis()
+        backgroundedAt = null
+        _stage.value = Stage.DECOY
     }
 
     /* ── Biometric ────────────────────────────────────────────────────────── */
@@ -210,6 +245,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     val data = repo.unlockWithKey(key)
                     if (data != null) {
                         _vault.value = data
+                        cacheSettings(data)
                         refreshVaultBytes()
                         lastInteraction = System.currentTimeMillis()
                         _stage.value = Stage.UNLOCKED
@@ -389,6 +425,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val current = _vault.value ?: return
         val updated = current.copy(settings = transform(current.settings))
         _vault.value = updated
+        lastKnownSettings = updated.settings
         repo.persist(updated)
         refreshVaultBytes()
     }
@@ -470,6 +507,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 onResult("Wrong password for this backup — or the file is damaged")
             } else {
                 _vault.value = data
+                cacheSettings(data)
                 refreshVaultBytes()
                 _stage.value = Stage.UNLOCKED
                 toast("Backup restored")
@@ -553,9 +591,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun onForeground() {
         val backgrounded = backgroundedAt ?: return
         backgroundedAt = null
-        val minutes = _vault.value?.settings?.autoLockMinutes ?: 1
+        val stage = _stage.value
+        val minutes = if (stage == Stage.DECOY) {
+            _decoySettings.value.autoLockMinutes
+        } else {
+            _vault.value?.settings?.autoLockMinutes ?: 1
+        }
         val elapsed = System.currentTimeMillis() - backgrounded
-        if (_stage.value == Stage.UNLOCKED && minutes >= 0 && elapsed > minutes * 60_000L) {
+        if ((stage == Stage.UNLOCKED || stage == Stage.DECOY) && minutes >= 0 && elapsed > minutes * 60_000L) {
             lockWithMessage()
         } else {
             lastInteraction = System.currentTimeMillis()
@@ -563,9 +606,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun tick() {
-        if (_stage.value != Stage.UNLOCKED) return
+        val stage = _stage.value
+        if (stage != Stage.UNLOCKED && stage != Stage.DECOY) return
         if (systemPromptActive) return
-        val minutes = _vault.value?.settings?.autoLockMinutes ?: return
+        val minutes = if (stage == Stage.DECOY) {
+            _decoySettings.value.autoLockMinutes
+        } else {
+            _vault.value?.settings?.autoLockMinutes ?: return
+        }
         if (minutes < 0) return
         if (System.currentTimeMillis() - lastInteraction > minutes * 60_000L) {
             lockWithMessage()

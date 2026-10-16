@@ -13,8 +13,8 @@ android {
         applicationId = "com.aegis.vault"
         minSdk = 26
         targetSdk = 35
-        versionCode = 129
-        versionName = "4.2.1"
+        versionCode = 130
+        versionName = "4.3.0"
     }
 
     buildTypes {
