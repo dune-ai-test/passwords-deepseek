@@ -195,7 +195,7 @@ Lazy cleanup keeps sessions/relay/rate-limit tables small — no cron needed.
 ```
 cloud/
 ├─ schema.sql               D1 tables (run once per environment)
-├─ public/                  static share page  (index.html, app.js, style.css, _headers)
+├─ public/                  share page (index.html, style.css, app.js, favicon.svg, _headers)
 ├─ functions/v1/[[path]].js       sync API:     register, login, vault, relink, delete
 ├─ functions/api/relay/[[path]].js share relay: create, lookup, upload, fetch
 ├─ functions/_lib/core.js   shared helpers (b64url, HMAC, rate limits, auth)

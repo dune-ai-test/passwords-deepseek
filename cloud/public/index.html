@@ -4,67 +4,86 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="light dark">
 <title>Aegis — Receive from phone</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main class="card">
-  <header>
-    <div class="logo">A</div>
-    <div>
-      <h1>Aegis</h1>
-      <p class="sub">Receive one item from your phone</p>
-    </div>
+<div class="page">
+  <header class="masthead">
+    <span class="brand">
+      <svg class="mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 2.9 19 5.6v5.9c0 4.4-2.9 7.8-7 9.4-4.1-1.6-7-5-7-9.4V5.6L12 2.9Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+        <circle cx="12" cy="10.4" r="1.55" fill="currentColor"/>
+        <path d="M12 12.1v3.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+      </svg>
+      Aegis
+    </span>
+    <span class="brand-note">Zero-knowledge relay</span>
   </header>
 
-  <section id="state-connect">
-    <p class="hint">
-      On your phone, open the vault, pick an item and tap <strong>Send to PC</strong>.
-      Then type this code into the app:
-    </p>
-    <div class="code" id="code">······</div>
-    <div class="fingerprint">
-      <span class="fp-label">Confirm your phone shows this key</span>
-      <span class="fp-value" id="fingerprint">····-····</span>
-    </div>
-    <div class="waiting"><span class="spinner"></span><span id="waiting-text">Waiting for your phone…</span></div>
-    <p class="fine">
-      The code works once and expires after 3 minutes. The relay only ever sees
-      encrypted data — even this server can't read the item.
-    </p>
-  </section>
+  <main>
+    <section id="state-connect">
+      <h1>Receive from phone</h1>
+      <p class="lede">
+        On your phone, open the vault, pick an item and tap
+        <strong>Send to PC</strong> — then enter this code in the app:
+      </p>
+      <div class="code-label">One-time code</div>
+      <div class="code" id="code">··· ···</div>
+      <div class="fingerprint">
+        <span class="fp-label">Your phone should show</span>
+        <span class="fp-value" id="fingerprint">····-····</span>
+      </div>
+      <p class="status"><span class="pulse" aria-hidden="true"></span><span id="waiting-text">Waiting for your phone…</span></p>
+      <hr class="rule">
+      <p class="fine">
+        The code works once and expires after 3 minutes. The relay only ever
+        handles encrypted data — even the server can't read the item.
+      </p>
+      <noscript>
+        <p class="fine">This page needs JavaScript to set up the encrypted connection.</p>
+      </noscript>
+    </section>
 
-  <section id="state-item" hidden>
-    <div class="item-head">
-      <span class="badge" id="item-type">Item</span>
-      <h2 id="item-title">—</h2>
-    </div>
-    <div id="fields"></div>
-    <div id="notes-wrap" hidden>
-      <div class="notes-label">Notes</div>
-      <div class="notes" id="notes"></div>
-    </div>
-    <div class="countdown-row">
-      <span class="countdown">Clears in <span id="countdown">60s</span></span>
-      <button class="ghost" id="clear-now">Clear now</button>
-    </div>
-  </section>
+    <section id="state-item" hidden>
+      <div class="item-head">
+        <span class="badge" id="item-type">Item</span>
+        <h2 id="item-title">—</h2>
+      </div>
+      <div id="fields"></div>
+      <div id="notes-wrap" hidden>
+        <div class="notes-label">Notes</div>
+        <div class="notes" id="notes"></div>
+      </div>
+      <div class="countdown-row">
+        <span class="countdown">Clears in <span id="countdown">60s</span></span>
+        <button class="ghost" id="clear-now">Clear now</button>
+      </div>
+    </section>
 
-  <section id="state-cleared" hidden>
-    <div class="done">✓</div>
-    <h2>Cleared</h2>
-    <p class="hint">The item was wiped from this page and from the relay. You can close this tab.</p>
-    <button class="primary" id="restart-cleared">Send another item</button>
-  </section>
+    <section id="state-cleared" hidden>
+      <div class="state-icon" aria-hidden="true">
+        <svg viewBox="0 0 16 16" fill="none"><path d="M3.2 8.3 6.4 11.5 12.8 4.7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <h2>Cleared</h2>
+      <p class="lede">The item was wiped from this page and from the relay. You can close this tab.</p>
+      <button class="primary" id="restart-cleared">Send another item</button>
+    </section>
 
-  <section id="state-error" hidden>
-    <div class="done warn">!</div>
-    <h2 id="error-title">Something went wrong</h2>
-    <p class="hint" id="error-text">—</p>
-    <button class="primary" id="restart-error">Start again</button>
-  </section>
-</main>
-<footer>Aegis · zero-knowledge · nothing on this page is stored in readable form</footer>
+    <section id="state-error" hidden>
+      <div class="state-icon" aria-hidden="true">
+        <svg viewBox="0 0 16 16"><path d="M8 3.2v5.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="8" cy="12.3" r="1.15" fill="currentColor"/></svg>
+      </div>
+      <h2 id="error-title">Something went wrong</h2>
+      <p class="lede" id="error-text">—</p>
+      <button class="primary" id="restart-error">Start again</button>
+    </section>
+  </main>
+
+  <footer>End-to-end encrypted. Nothing on this page is stored in readable form.</footer>
+</div>
 <script src="app.js"></script>
 </body>
 </html>
