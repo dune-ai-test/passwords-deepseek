@@ -14,6 +14,9 @@ import com.aegis.vault.crypto.CloudKeys
 import com.aegis.vault.crypto.Crypto
 import com.aegis.vault.crypto.ShareCrypto
 import com.aegis.vault.data.CardItem
+import com.aegis.vault.data.Duress
+import com.aegis.vault.data.DuressStore
+import com.aegis.vault.data.Fmt
 import com.aegis.vault.data.IdentityItem
 import com.aegis.vault.data.LoginItem
 import com.aegis.vault.data.NoteItem
@@ -47,6 +50,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repo = VaultRepository(app)
     private val wordlist = Wordlist(app)
+    private val duress = DuressStore(app)
     private val clipboard = app.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
     private val _stage = MutableStateFlow(if (repo.vaultExists()) Stage.LOCKED else Stage.FIRST_RUN)
@@ -148,9 +152,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 lastInteraction = System.currentTimeMillis()
                 _stage.value = Stage.UNLOCKED
                 onResult(true)
+                notifyDecoyOpens()
             } else {
                 onResult(false)
                 // Wrong password: open the decoy vault instead of an error.
+                // A registered duress code only *labels* the event — every
+                // failed attempt opens the decoy either way, so nothing about
+                // the response reveals which input was used.
+                val isDuress = withContext(Dispatchers.Default) {
+                    duress.hasCode && duress.verify(password.toCharArray())
+                }
+                duress.addEvent(isDuress)
                 enterDecoy()
             }
         }
@@ -180,6 +192,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun wipeVault() {
         viewModelScope.launch {
             repo.wipeEverything()
+            duress.clearCode()
+            duress.clearEvents()
             refreshVaultBytes()
             BiometricKeys.delete()
             val hadCloud = cloud.enabled
@@ -271,6 +285,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         lastInteraction = System.currentTimeMillis()
                         _stage.value = Stage.UNLOCKED
                         onResult(true)
+                        notifyDecoyOpens()
                     } else {
                         onResult(false)
                     }
@@ -490,6 +505,71 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
+    }
+
+    /* ── Duress code & decoy log ──────────────────────────────────────────── */
+
+    fun duressEnabled(): Boolean = duress.hasCode
+
+    fun decoyEvents(): List<Duress.Event> = duress.events()
+
+    fun clearDecoyEvents() {
+        duress.clearEvents()
+        toast("Decoy activity cleared")
+    }
+
+    /**
+     * Register (or replace) the duress code. Refuses the master password so
+     * the two can never be confused: a valid master password decrypts the
+     * real vault before the duress route would ever be reached.
+     */
+    fun setDuressCode(code: String, onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            if (code.length < Duress.MIN_LENGTH) {
+                onResult("Use at least ${Duress.MIN_LENGTH} characters")
+                return@launch
+            }
+            if (code.length > Duress.MAX_LENGTH) {
+                onResult("Keep it under ${Duress.MAX_LENGTH} characters")
+                return@launch
+            }
+            _busyText.value = "Checking duress code…"
+            _busy.value = true
+            val isMaster = repo.unlock(code.toCharArray()) != null
+            if (isMaster) {
+                _busy.value = false
+                onResult("That's your master password — pick a different code")
+                return@launch
+            }
+            val replacing = duress.hasCode
+            withContext(Dispatchers.Default) { duress.setCode(code.toCharArray()) }
+            _busy.value = false
+            toast(if (replacing) "Duress code updated" else "Duress code set")
+            onResult(null)
+        }
+    }
+
+    fun removeDuressCode() {
+        duress.clearCode()
+        toast("Duress code removed")
+    }
+
+    /** One-time notice when the decoy was opened since the owner last looked. */
+    private fun notifyDecoyOpens() {
+        val unseen = duress.unseenEvents()
+        if (unseen.isEmpty()) return
+        duress.markEventsSeen()
+        val last = unseen.last()
+        toast(
+            when {
+                unseen.size == 1 && last.duress ->
+                    "Duress code was used — the decoy vault opened ${Fmt.relativeTime(last.at)}"
+                unseen.size == 1 ->
+                    "The decoy vault was opened ${Fmt.relativeTime(last.at)}"
+                else ->
+                    "The decoy vault was opened ${unseen.size} times — last ${Fmt.relativeTime(last.at)}"
+            }
+        )
     }
 
     /* ── Backup ───────────────────────────────────────────────────────────── */

@@ -44,7 +44,7 @@ import com.aegis.vault.ui.design.ConfirmDialog
 import com.aegis.vault.ui.design.IOSSwitch
 import com.aegis.vault.ui.design.SettingsRow
 
-private enum class SettingsSheet { AUTOLOCK, BACKUP, ABOUT, HELP, MASTER, IMPORT_PASSWORD, CLOUD_SETUP, CLOUD }
+private enum class SettingsSheet { AUTOLOCK, BACKUP, ABOUT, HELP, MASTER, DURESS, DECOY_LOG, IMPORT_PASSWORD, CLOUD_SETUP, CLOUD }
 
 @Composable
 fun SettingsScreen(vm: AppViewModel, nav: Navigator, activity: FragmentActivity) {
@@ -53,6 +53,7 @@ fun SettingsScreen(vm: AppViewModel, nav: Navigator, activity: FragmentActivity)
     val settings = data.settings
     val vaultBytes by vm.vaultBytes.collectAsStateWithLifecycle()
     val cloudState by vm.cloudState.collectAsStateWithLifecycle()
+    val decoyEvents = vm.decoyEvents()
     val context = LocalContext.current
 
     var sheet by remember { mutableStateOf<SettingsSheet?>(null) }
@@ -185,6 +186,28 @@ fun SettingsScreen(vm: AppViewModel, nav: Navigator, activity: FragmentActivity)
             Spacer(Modifier.height(20.dp))
             AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
                 SettingsRow(
+                    icon = R.drawable.ic_shield,
+                    title = "Duress code",
+                    subtitle = "A second code that opens the decoy vault",
+                    value = if (vm.duressEnabled()) "Set" else "Off",
+                    onClick = { sheet = SettingsSheet.DURESS },
+                )
+                SettingsRow(
+                    icon = R.drawable.ic_triangle_alert,
+                    title = "Decoy activity",
+                    value = if (decoyEvents.isEmpty()) {
+                        "Never"
+                    } else {
+                        "${decoyEvents.size} open${if (decoyEvents.size == 1) "" else "s"}"
+                    },
+                    onClick = { sheet = SettingsSheet.DECOY_LOG },
+                    divider = false,
+                )
+            }
+
+            Spacer(Modifier.height(20.dp))
+            AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
+                SettingsRow(
                     icon = R.drawable.ic_share_2,
                     title = "Export to file",
                     subtitle = "Save an encrypted backup",
@@ -286,6 +309,12 @@ fun SettingsScreen(vm: AppViewModel, nav: Navigator, activity: FragmentActivity)
         SettingsSheet.ABOUT -> AboutSheet(onDismiss = { sheet = null })
         SettingsSheet.HELP -> HelpSheet(onDismiss = { sheet = null })
         SettingsSheet.MASTER -> ChangeMasterSheet(vm = vm, onDismiss = { sheet = null })
+        SettingsSheet.DURESS -> DuressCodeSheet(vm = vm, onDismiss = { sheet = null })
+        SettingsSheet.DECOY_LOG -> DecoyLogSheet(
+            events = decoyEvents,
+            onClear = { vm.clearDecoyEvents() },
+            onDismiss = { sheet = null },
+        )
         SettingsSheet.CLOUD_SETUP -> CloudSetupSheet(vm = vm, onDismiss = { sheet = null })
         SettingsSheet.CLOUD -> CloudSheet(vm = vm, onDismiss = { sheet = null })
         SettingsSheet.IMPORT_PASSWORD -> {

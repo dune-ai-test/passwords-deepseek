@@ -204,6 +204,10 @@ fun HelpSheet(onDismiss: () -> Unit) {
             "One minute by default. Change it under Settings → Auto-lock, or disable it with Never.",
         )
         HelpItem(
+            "Duress code",
+            "Set one under Settings → Duress code. Enter it at the unlock screen when you're forced to open your vault — it shows the decoy vault, and Settings → Decoy activity records every use.",
+        )
+        HelpItem(
             "Clipboard",
             "Passwords copied from a detail screen clear themselves from the clipboard after 60 seconds.",
         )

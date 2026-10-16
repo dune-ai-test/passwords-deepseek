@@ -13,6 +13,7 @@ through an encrypted backup file you export yourself.
 
 - 🔐 **Master password vault** — AES-256-GCM encrypted file, PBKDF2-HMAC-SHA256 (600,000 iterations)
 - 🫆 **Biometric unlock** — fingerprint / face via Android Keystore (key invalidates if biometrics change)
+- 🕵️ **Duress code & decoy activity** — enter your duress code when forced to unlock: it opens the decoy vault, and the real vault records every decoy open (duress vs wrong password)
 - 🗂️ **Logins, Cards, Notes, Identities** — tags, search, recently used, password history
 - 🎲 **Password generator** — random (length, character classes, avoid look-alikes) and memorable (EFF wordlist passphrase)
 - 🛡️ **Security audit** — weak, reused and old passwords scored locally
@@ -41,6 +42,7 @@ CI proves it compiles, passes the unit tests and packages; these flows need a re
 - Create one of each item type (login, card, note, identity), kill the app, reopen — auto-lock should have kicked in
 - Settings → Export to file, then restore from that `.aegis` file
 - Copy a password, paste it elsewhere, confirm the clipboard clears after ~60 s
+- Set a duress code (Settings → Duress code), lock the app, unlock with the duress code — the decoy opens; unlock with your master password — a notice reports the decoy open, and Decoy activity lists it
 - Share a login / export a note — the Android share sheet and file picker should appear
 
 ## Building
@@ -64,14 +66,15 @@ gradle assembleDebug
 ```
 
 The JVM unit tests cover AES-GCM round-trips and tamper detection, PBKDF2
-determinism, vault-file serialization, generator guarantees and audit scoring.
+determinism, vault-file serialization, generator guarantees, audit scoring and
+the duress verifier / decoy log.
 
 ## Architecture
 
 ```
 app/src/main/java/com/aegis/vault/
 ├── crypto/   → PBKDF2 KDF, AES-256-GCM, vault file format, Keystore wrapping
-├── data/     → models, encrypted vault repository, audit, generator, search
+├── data/     → models, encrypted vault repository, audit, generator, search, duress code & decoy log
 ├── ui/design → custom design system (palette, type, components — no Material)
 ├── ui/screens→ all app screens
 ├── AppViewModel.kt → app state, auto-lock, clipboard, export/import
@@ -86,6 +89,11 @@ app/src/main/java/com/aegis/vault/
   password-derived key — your data is never re-encrypted, and the biometric
   link stays valid.
 - Writes are atomic (temp file + rename), so a crash can't corrupt the vault.
+- The decoy vault is pure presentation: a failed unlock renders in-memory demo
+  content and never reads or writes the real vault. The optional duress code is
+  a registered second secret that labels (and only labels) such opens — every
+  failed attempt opens the decoy either way. The decoy log stores timestamps
+  and a duress flag, never content, in app-private preferences.
 
 ## Design
 

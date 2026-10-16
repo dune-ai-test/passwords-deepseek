@@ -45,12 +45,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aegis.vault.AppViewModel
 import com.aegis.vault.BuildConfig
 import com.aegis.vault.R
+import com.aegis.vault.data.Duress
 import com.aegis.vault.data.Fmt
 import com.aegis.vault.data.ItemType
 import com.aegis.vault.data.PasswordTools
 import com.aegis.vault.data.VaultItem
 import com.aegis.vault.ui.CategoryMode
 import com.aegis.vault.ui.design.AegisButton
+import com.aegis.vault.ui.design.AegisButtonStyle
 import com.aegis.vault.ui.design.AegisCard
 import com.aegis.vault.ui.design.AegisColors
 import com.aegis.vault.ui.design.AegisFilterChip
@@ -666,7 +668,7 @@ private fun FakeRoundAction(icon: Int, tint: Color, onClick: () -> Unit) {
  * Settings
  * ──────────────────────────────────────────────────────────────────────────── */
 
-private enum class FakeSheet { AUTOLOCK, BACKUP, CLOUD, ABOUT, HELP, MASTER, IMPORT_PASSWORD }
+private enum class FakeSheet { AUTOLOCK, BACKUP, CLOUD, ABOUT, HELP, MASTER, DURESS, DECOY_LOG, IMPORT_PASSWORD }
 
 @Composable
 fun FakeSettingsScreen(vm: AppViewModel, nav: FakeNavigator, state: FakeVaultState) {
@@ -823,6 +825,24 @@ fun FakeSettingsScreen(vm: AppViewModel, nav: FakeNavigator, state: FakeVaultSta
             Spacer(Modifier.height(20.dp))
             AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
                 SettingsRow(
+                    icon = R.drawable.ic_shield,
+                    title = "Duress code",
+                    subtitle = "A second code that opens the decoy vault",
+                    value = if (state.duressConfigured) "Set" else "Off",
+                    onClick = { sheet = FakeSheet.DURESS },
+                )
+                SettingsRow(
+                    icon = R.drawable.ic_triangle_alert,
+                    title = "Decoy activity",
+                    value = "Never",
+                    onClick = { sheet = FakeSheet.DECOY_LOG },
+                    divider = false,
+                )
+            }
+
+            Spacer(Modifier.height(20.dp))
+            AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
+                SettingsRow(
                     icon = R.drawable.ic_share_2,
                     title = "Export to file",
                     subtitle = "Save an encrypted backup",
@@ -922,6 +942,8 @@ fun FakeSettingsScreen(vm: AppViewModel, nav: FakeNavigator, state: FakeVaultSta
         FakeSheet.ABOUT -> AboutSheet(onDismiss = { sheet = null })
         FakeSheet.HELP -> HelpSheet(onDismiss = { sheet = null })
         FakeSheet.MASTER -> FakeChangeMasterSheet(vm = vm, onDismiss = { sheet = null })
+        FakeSheet.DURESS -> FakeDuressSheet(vm = vm, state = state, onDismiss = { sheet = null })
+        FakeSheet.DECOY_LOG -> FakeDecoyLogSheet(onDismiss = { sheet = null })
         FakeSheet.IMPORT_PASSWORD -> FakeImportPasswordSheet(onDismiss = { sheet = null })
         null -> {}
     }
@@ -1085,5 +1107,114 @@ private fun FakeCloudSheet(vm: AppViewModel, onDismiss: () -> Unit) {
             "The first upload can take a minute — your password is being stretched into keys on this device. This never changes your master password.",
             icon = R.drawable.ic_lock,
         )
+    }
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Duress code (parity UI — nothing persists, no unlock consults it)
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+@Composable
+private fun FakeDuressSheet(vm: AppViewModel, state: FakeVaultState, onDismiss: () -> Unit) {
+    var code by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    var confirming by remember { mutableStateOf(false) }
+    var confirmRemove by remember { mutableStateOf(false) }
+    val valid = code.length >= Duress.MIN_LENGTH && code == confirm && !confirming
+
+    if (confirming) {
+        LaunchedEffect(Unit) {
+            delay(900)
+            confirming = false
+            val replacing = state.duressConfigured
+            state.duressConfigured = true
+            vm.toast(if (replacing) "Duress code updated" else "Duress code set")
+            onDismiss()
+        }
+    }
+
+    ModalSheet(onDismiss = onDismiss) {
+        SheetTitle("Duress code")
+        Spacer(Modifier.height(6.dp))
+        AText(
+            "If you're ever forced to unlock the vault, enter this code instead of your master password. It opens the decoy vault — your real data stays locked, and every use is recorded under Decoy activity.",
+            style = AegisType.small,
+        )
+        Spacer(Modifier.height(14.dp))
+        AegisPasswordField(
+            value = code,
+            onValueChange = { code = it },
+            placeholder = if (state.duressConfigured) "New duress code" else "Duress code",
+            leadingIcon = R.drawable.ic_shield,
+        )
+        Spacer(Modifier.height(10.dp))
+        AegisPasswordField(
+            value = confirm,
+            onValueChange = { confirm = it },
+            placeholder = "Confirm duress code",
+        )
+        Spacer(Modifier.height(8.dp))
+        AText(
+            "At least ${Duress.MIN_LENGTH} characters — choose something you can't confuse with your master password.",
+            style = AegisType.caption,
+        )
+        Spacer(Modifier.height(16.dp))
+        AegisButton(
+            text = when {
+                confirming -> "Saving…"
+                state.duressConfigured -> "Update duress code"
+                else -> "Set duress code"
+            },
+            onClick = { confirming = true },
+            enabled = valid,
+        )
+        if (state.duressConfigured) {
+            Spacer(Modifier.height(10.dp))
+            AegisButton(
+                text = "Remove duress code",
+                style = AegisButtonStyle.GHOST,
+                onClick = { confirmRemove = true },
+            )
+        }
+    }
+
+    if (confirmRemove) {
+        ConfirmDialog(
+            title = "Remove the duress code?",
+            message = "A wrong password will still open the decoy vault afterwards — only the registered code stops working.",
+            confirmLabel = "Remove",
+            destructive = true,
+            onConfirm = {
+                confirmRemove = false
+                state.duressConfigured = false
+                vm.toast("Duress code removed")
+                onDismiss()
+            },
+            onDismiss = { confirmRemove = false },
+        )
+    }
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Decoy activity (parity UI — the decoy never shows its own log)
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+@Composable
+private fun FakeDecoyLogSheet(onDismiss: () -> Unit) {
+    ModalSheet(onDismiss = onDismiss) {
+        SheetTitle("Decoy activity")
+        Spacer(Modifier.height(6.dp))
+        AText(
+            "Every time the decoy vault is opened — with your duress code or a wrong password — it's recorded here. This list exists only in the real vault.",
+            style = AegisType.small,
+        )
+        Spacer(Modifier.height(10.dp))
+        AText(
+            "Nothing yet — the decoy has never been opened.",
+            style = AegisType.small.copy(color = AegisColors.inkSecondary),
+            modifier = Modifier.padding(vertical = 8.dp),
+        )
+        Spacer(Modifier.height(16.dp))
+        AegisButton(text = "Close", style = AegisButtonStyle.GHOST, onClick = onDismiss)
     }
 }

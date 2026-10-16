@@ -1,6 +1,9 @@
 package com.aegis.vault.ui.screens.fake
 
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.aegis.vault.data.CardItem
 import com.aegis.vault.data.IdentityItem
 import com.aegis.vault.data.LoginItem
@@ -205,6 +208,13 @@ object FakeVaultData {
 class FakeVaultState {
 
     val items = mutableStateListOf<VaultItem>().apply { addAll(FakeVaultData.items()) }
+
+    /**
+     * Session-only stand-in for the duress code: the fake sheet "sets" and
+     * "removes" it so the decoy Settings looks identical, but nothing is ever
+     * persisted and no unlock anywhere consults it.
+     */
+    var duressConfigured by mutableStateOf(false)
 
     val activeItems: List<VaultItem> get() = items.filter { !it.isTrashed }
 
