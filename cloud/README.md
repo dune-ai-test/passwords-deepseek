@@ -31,41 +31,23 @@ has a **Server** field where you type your actual URL, so nothing else changes.
 
 ## 1b. Alternative — set up entirely from the dashboards (no command line)
 
-Everything can be done in a browser: the Cloudflare dashboard plus one small
-edit on github.com. No Node.js, no wrangler. (The smoke test in step 3 is the
-only CLI extra; the app itself is the real end-to-end test.)
+Everything can be done in a browser — the Cloudflare dashboard only. No
+Node.js, no wrangler, no repo edits. (The smoke test in step 3 is the only CLI
+extra; the app itself is the real end-to-end test.)
 
 ### A. Create the database
 
 1. Cloudflare dashboard → **Workers & Pages → D1** (newer dashboards:
    **Storage & Databases → D1 SQL database**) → **Create database** → name it
    `aegis-db` → Create.
-2. Open `aegis-db` and copy its **Database ID** (a UUID).
-3. Open the **Console** tab, paste the contents of `cloud/schema.sql` from the
+2. Open the **Console** tab, paste the contents of `cloud/schema.sql` from the
    repo, and **Execute**. If the console refuses multiple statements, run the
    nine `CREATE TABLE` / `CREATE INDEX` statements from that file one at a
    time.
-4. Check the **Tables** tab — you should see `accounts`, `sessions`, `vaults`,
+3. Check the **Tables** tab — you should see `accounts`, `sessions`, `vaults`,
    `vault_history`, `relay` and `rate_limits`.
 
-### B. Point the project config at the database (github.com)
-
-Open `cloud/wrangler.toml` on github.com → pencil icon → replace
-`PASTE_YOUR_DATABASE_ID_HERE` with the Database ID → **Commit changes** to
-`main`. This id belongs in this config file, not in the dashboard's
-variables — it is a *binding* (how the code reaches the database as
-`env.DB`), not an environment variable. (If the repo lives in an organization
-you can't authorize, fork it to your own account first — then use the fork
-below.)
-
-**Prefer the dashboard binding UI?** That path works too: delete the whole
-`[[d1_databases]]` block from `cloud/wrangler.toml` (so the file no longer
-claims the `DB` binding), then in the Pages project go to
-**Settings → Bindings → Add → D1 database**, variable name `DB`, database
-`aegis-db` — and retry the deployment. Use exactly **one** of the two
-methods; defining `DB` in both the file and the dashboard is where it breaks.
-
-### C. Create the Pages project
+### B. Create the Pages project
 
 Workers & Pages → **Create** → **Pages** → **Connect to Git** → authorize the
 Cloudflare GitHub app → pick the repo and the `main` branch → in the setup
@@ -80,7 +62,19 @@ form:
 | Build output directory | `public` |
 | Root directory (advanced) | `cloud` |
 
-**Save and Deploy** — the first build takes a minute or two.
+**Save and Deploy** — the first build takes a minute or two. (If the repo
+lives in an organization you can't authorize, fork it to your own account
+first and connect the fork.)
+
+### C. Bind the database
+
+Project → **Settings → Bindings → Add → D1 database** → variable name `DB`
+(exactly this — it's what the code reads), database `aegis-db`.
+
+This project's `cloud/wrangler.toml` intentionally does **not** declare the
+binding, so the dashboard is the single source for it — never both. (CLI
+deployers can instead uncomment the `[[d1_databases]]` block at the bottom of
+that file and paste their database id.)
 
 ### D. Add the server secret
 
@@ -114,7 +108,8 @@ npx wrangler@latest login
 # 2. Create the D1 database. Copy the "database_id" from the output.
 npx wrangler@latest d1 create aegis-db
 
-# 3. Open wrangler.toml and replace PASTE_YOUR_DATABASE_ID_HERE with that id.
+# 3. Uncomment the [[d1_databases]] block at the bottom of wrangler.toml and
+#    replace PASTE_YOUR_DATABASE_ID_HERE with that id.
 
 # 4. Create the tables (schema.sql) in the remote database.
 npx wrangler@latest d1 execute aegis-db --remote --file=./schema.sql
@@ -214,6 +209,7 @@ cloud/
 | ------- | --- |
 | `wrangler` asks to log in repeatedly | run `npx wrangler@latest login` again — the session expired |
 | Dashboard path: register still 500 `not-configured` after adding `SERVER_SECRET` | retry the latest deployment (Settings apply to new deployments only) |
+| Dashboard path: share page never gets a code, or the app says “Couldn't reach the server” | the `DB` binding is missing — add it under Settings → Bindings and retry the deployment |
 | Deploy succeeds but API returns 500 `not-configured` | the `SERVER_SECRET` is missing — re-run step 7 and redeploy |
 | App says “Couldn't reach the server” | check the Server URL in the app (https, no trailing slash is fine either way) |
 | `d1 execute` says “no migrations” | you ran it against the wrong database name; use `aegis-db` |
