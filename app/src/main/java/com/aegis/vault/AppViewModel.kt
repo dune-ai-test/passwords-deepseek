@@ -1016,7 +1016,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return "Password updated — cloud backup was turned off. Set it up again in Settings"
         }
         val login = client.login(newCreds.accountId, newCreds.authKey)
-        if (login == null || login.status != 200 || login.token == null) {
+        val newToken = if (login != null && login.status == 200) login.token else null
+        if (newToken == null) {
             cloud.disable()
             cloudSyncedGeneration = cloudGeneration
             refreshCloudState()
@@ -1024,7 +1025,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         cloud.accountId = newCreds.accountId
         cloud.authKey = newCreds.authKey
-        cloud.saveSession(login.token, login.expiresAt ?: 0L)
+        cloud.saveSession(newToken, login?.expiresAt ?: 0L)
         refreshCloudState()
         return null
     }
