@@ -52,8 +52,11 @@ only CLI extra; the app itself is the real end-to-end test.)
 
 Open `cloud/wrangler.toml` on github.com → pencil icon → replace
 `PASTE_YOUR_DATABASE_ID_HERE` with the Database ID → **Commit changes** to
-`main`. (If the repo lives in an organization you can't authorize, fork it to
-your own account first — then use the fork below.)
+`main`. This id belongs in this config file, not in the dashboard's
+variables — it is a *binding* (how the code reaches the database as
+`env.DB`), not an environment variable. (If the repo lives in an organization
+you can't authorize, fork it to your own account first — then use the fork
+below.)
 
 ### C. Create the Pages project
 
@@ -76,9 +79,10 @@ form:
 
 1. Project → **Settings → Variables and secrets → Add** → type **Secret**,
    name `SERVER_SECRET`, value: a long random string (40+ characters — you can
-   generate one in the Aegis app itself). Save it in your password manager:
-   it peppers the account verifier, and losing it means every account must
-   re-enable cloud backup.
+   generate one in the Aegis app itself). The app never needs this value — it
+   lives only between your password manager and the server. Save it in your
+   password manager: it peppers the account verifier, and losing it means
+   every account must re-enable cloud backup.
 2. The change applies to *new* deployments: go to **Deployments** → latest →
    **⋯ → Retry deployment**.
 
