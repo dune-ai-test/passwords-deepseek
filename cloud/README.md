@@ -58,6 +58,13 @@ variables — it is a *binding* (how the code reaches the database as
 you can't authorize, fork it to your own account first — then use the fork
 below.)
 
+**Prefer the dashboard binding UI?** That path works too: delete the whole
+`[[d1_databases]]` block from `cloud/wrangler.toml` (so the file no longer
+claims the `DB` binding), then in the Pages project go to
+**Settings → Bindings → Add → D1 database**, variable name `DB`, database
+`aegis-db` — and retry the deployment. Use exactly **one** of the two
+methods; defining `DB` in both the file and the dashboard is where it breaks.
+
 ### C. Create the Pages project
 
 Workers & Pages → **Create** → **Pages** → **Connect to Git** → authorize the
