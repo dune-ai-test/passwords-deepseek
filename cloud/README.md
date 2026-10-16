@@ -29,6 +29,69 @@ If `aegis-cloud` is already taken by someone else, pick any other name
 (e.g. `aegis-cloud-yourname`) — everything below still applies, and the app
 has a **Server** field where you type your actual URL, so nothing else changes.
 
+## 1b. Alternative — set up entirely from the dashboards (no command line)
+
+Everything can be done in a browser: the Cloudflare dashboard plus one small
+edit on github.com. No Node.js, no wrangler. (The smoke test in step 3 is the
+only CLI extra; the app itself is the real end-to-end test.)
+
+### A. Create the database
+
+1. Cloudflare dashboard → **Workers & Pages → D1** (newer dashboards:
+   **Storage & Databases → D1 SQL database**) → **Create database** → name it
+   `aegis-db` → Create.
+2. Open `aegis-db` and copy its **Database ID** (a UUID).
+3. Open the **Console** tab, paste the contents of `cloud/schema.sql` from the
+   repo, and **Execute**. If the console refuses multiple statements, run the
+   nine `CREATE TABLE` / `CREATE INDEX` statements from that file one at a
+   time.
+4. Check the **Tables** tab — you should see `accounts`, `sessions`, `vaults`,
+   `vault_history`, `relay` and `rate_limits`.
+
+### B. Point the project config at the database (github.com)
+
+Open `cloud/wrangler.toml` on github.com → pencil icon → replace
+`PASTE_YOUR_DATABASE_ID_HERE` with the Database ID → **Commit changes** to
+`main`. (If the repo lives in an organization you can't authorize, fork it to
+your own account first — then use the fork below.)
+
+### C. Create the Pages project
+
+Workers & Pages → **Create** → **Pages** → **Connect to Git** → authorize the
+Cloudflare GitHub app → pick the repo and the `main` branch → in the setup
+form:
+
+| Field | Value |
+| --- | --- |
+| Project name | `aegis-cloud` — or any name if it's taken (e.g. `aegis-cloud-yourname`); the app's **Server** field takes whatever URL you get |
+| Production branch | `main` |
+| Framework preset | None |
+| Build command | *(leave empty)* |
+| Build output directory | `public` |
+| Root directory (advanced) | `cloud` |
+
+**Save and Deploy** — the first build takes a minute or two.
+
+### D. Add the server secret
+
+1. Project → **Settings → Variables and secrets → Add** → type **Secret**,
+   name `SERVER_SECRET`, value: a long random string (40+ characters — you can
+   generate one in the Aegis app itself). Save it in your password manager:
+   it peppers the account verifier, and losing it means every account must
+   re-enable cloud backup.
+2. The change applies to *new* deployments: go to **Deployments** → latest →
+   **⋯ → Retry deployment**.
+
+### E. Verify without a command line
+
+- `https://<project>.pages.dev` shows the dark share page **with a 6-character
+  code** (proves Functions + D1 are wired — the code comes from the relay).
+- `https://<project>.pages.dev/v1/vault` shows `{"error":"auth"}` (sync API
+  is up).
+- The real test: in the app, Settings → **Cloud backup** → master password +
+  your URL → turn it on → **Back up now** → "Last backup just now". Then try
+  **Send to PC**.
+
 ## 2. Set up (one time, ~5 minutes)
 
 Open a terminal in this `cloud/` folder and run these in order.
@@ -139,6 +202,7 @@ cloud/
 | Symptom | Fix |
 | ------- | --- |
 | `wrangler` asks to log in repeatedly | run `npx wrangler@latest login` again — the session expired |
+| Dashboard path: register still 500 `not-configured` after adding `SERVER_SECRET` | retry the latest deployment (Settings apply to new deployments only) |
 | Deploy succeeds but API returns 500 `not-configured` | the `SERVER_SECRET` is missing — re-run step 7 and redeploy |
 | App says “Couldn't reach the server” | check the Server URL in the app (https, no trailing slash is fine either way) |
 | `d1 execute` says “no migrations” | you ran it against the wrong database name; use `aegis-db` |
