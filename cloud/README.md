@@ -71,10 +71,11 @@ first and connect the fork.)
 Project → **Settings → Bindings → Add → D1 database** → variable name `DB`
 (exactly this — it's what the code reads), database `aegis-db`.
 
-This project's `cloud/wrangler.toml` intentionally does **not** declare the
-binding, so the dashboard is the single source for it — never both. (CLI
-deployers can instead uncomment the `[[d1_databases]]` block at the bottom of
-that file and paste their database id.)
+There is **no `wrangler.toml`** in this project on purpose: a Pages project
+whose repo contains one gets its bindings **locked** to that file (the
+dashboard shows “Bindings for this project are being managed through
+wrangler.toml” and the Bindings tab is read-only). With the file gone, the
+dashboard is the single source for bindings and variables.
 
 ### D. Add the server secret
 
@@ -108,8 +109,9 @@ npx wrangler@latest login
 # 2. Create the D1 database. Copy the "database_id" from the output.
 npx wrangler@latest d1 create aegis-db
 
-# 3. Uncomment the [[d1_databases]] block at the bottom of wrangler.toml and
-#    replace PASTE_YOUR_DATABASE_ID_HERE with that id.
+# 3. Add the D1 binding in the dashboard instead of a config file:
+#    Settings → Bindings → Add → D1 database, variable name DB,
+#    database aegis-db. (This project has no wrangler.toml.)
 
 # 4. Create the tables (schema.sql) in the remote database.
 npx wrangler@latest d1 execute aegis-db --remote --file=./schema.sql
@@ -124,7 +126,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 npx wrangler@latest pages secret put SERVER_SECRET --project-name aegis-cloud
 
 # 8. Deploy. The output prints your URL, e.g. https://aegis-cloud.pages.dev
-npx wrangler@latest pages deploy
+npx wrangler@latest pages deploy public
 ```
 
 > **Why the secret?** It peppers the account verifier
@@ -148,7 +150,7 @@ you should see the dark **“Aegis — Receive from phone”** share page with a
 6-character code.
 
 > Prefer to test locally first? `npx wrangler@latest d1 execute aegis-db --local --file=./schema.sql`
-> then `npx wrangler@latest pages dev` and point the smoke test at `http://127.0.0.1:8788`.
+> then `npx wrangler@latest pages dev public` and point the smoke test at `http://127.0.0.1:8788`.
 
 ## 4. Connect the app
 
@@ -163,7 +165,7 @@ you should see the dark **“Aegis — Receive from phone”** share page with a
 
 ## 5. Day-2 operations
 
-- **Redeploy after changes:** `npx wrangler@latest pages deploy` (run from this folder).
+- **Redeploy after changes:** push to `main` (the dashboard build runs automatically), or `npx wrangler@latest pages deploy public` (run from this folder).
 - **Update `schema.sql` later?** Re-run step 4 — all statements are idempotent (`IF NOT EXISTS`).
 - **See D1 data:** `npx wrangler@latest d1 execute aegis-db --remote --command "SELECT COUNT(*) FROM accounts"`.
 - **Rename to a different domain later:** create a new project, deploy the
@@ -192,7 +194,6 @@ Lazy cleanup keeps sessions/relay/rate-limit tables small — no cron needed.
 
 ```
 cloud/
-├─ wrangler.toml            Pages + D1 bindings
 ├─ schema.sql               D1 tables (run once per environment)
 ├─ public/                  static share page  (index.html, app.js, style.css, _headers)
 ├─ functions/v1/[[path]].js       sync API:     register, login, vault, relink, delete
@@ -203,6 +204,10 @@ cloud/
    └─ smoke.mjs             end-to-end test against a live URL
 ```
 
+There is no `wrangler.toml` on purpose — the Pages project reads its build
+settings from the dashboard form and its bindings from
+**Settings → Bindings**, so the dashboard stays in control.
+
 ## 8. Troubleshooting
 
 | Symptom | Fix |
@@ -210,6 +215,7 @@ cloud/
 | `wrangler` asks to log in repeatedly | run `npx wrangler@latest login` again — the session expired |
 | Dashboard path: register still 500 `not-configured` after adding `SERVER_SECRET` | retry the latest deployment (Settings apply to new deployments only) |
 | Dashboard path: share page never gets a code, or the app says “Couldn't reach the server” | the `DB` binding is missing — add it under Settings → Bindings and retry the deployment |
+| Settings → Bindings says “managed through wrangler.toml” | the repo contains a `cloud/wrangler.toml`; this project deliberately has none — remove the file, redeploy, and the Bindings tab unlocks |
 | Deploy succeeds but API returns 500 `not-configured` | the `SERVER_SECRET` is missing — re-run step 7 and redeploy |
 | App says “Couldn't reach the server” | check the Server URL in the app (https, no trailing slash is fine either way) |
 | `d1 execute` says “no migrations” | you ran it against the wrong database name; use `aegis-db` |

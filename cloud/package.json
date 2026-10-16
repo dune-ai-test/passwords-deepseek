@@ -8,8 +8,8 @@
     "test": "vitest run",
     "smoke": "node test/smoke.mjs",
     "check": "node --check functions/_lib/core.js && node --check \"functions/v1/[[path]].js\" && node --check \"functions/api/relay/[[path]].js\"",
-    "dev": "wrangler pages dev",
-    "deploy": "wrangler pages deploy"
+    "dev": "wrangler pages dev public",
+    "deploy": "wrangler pages deploy public"
   },
   "devDependencies": {
     "vitest": "^2.1.8"
