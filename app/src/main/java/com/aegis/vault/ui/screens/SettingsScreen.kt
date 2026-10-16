@@ -44,7 +44,7 @@ import com.aegis.vault.ui.design.ConfirmDialog
 import com.aegis.vault.ui.design.IOSSwitch
 import com.aegis.vault.ui.design.SettingsRow
 
-private enum class SettingsSheet { AUTOLOCK, BACKUP, ABOUT, HELP, MASTER, IMPORT_PASSWORD }
+private enum class SettingsSheet { AUTOLOCK, BACKUP, ABOUT, HELP, MASTER, IMPORT_PASSWORD, CLOUD_SETUP, CLOUD }
 
 @Composable
 fun SettingsScreen(vm: AppViewModel, nav: Navigator, activity: FragmentActivity) {
@@ -52,6 +52,7 @@ fun SettingsScreen(vm: AppViewModel, nav: Navigator, activity: FragmentActivity)
     val data = vaultState ?: return
     val settings = data.settings
     val vaultBytes by vm.vaultBytes.collectAsStateWithLifecycle()
+    val cloudState by vm.cloudState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var sheet by remember { mutableStateOf<SettingsSheet?>(null) }
@@ -107,7 +108,8 @@ fun SettingsScreen(vm: AppViewModel, nav: Navigator, activity: FragmentActivity)
                     Column {
                         AText("Local profile", style = AegisType.rowTitle)
                         AText(
-                            "No account needed — your data stays on this device",
+                            if (cloudState.enabled) "No account needed — end-to-end encrypted"
+                            else "No account needed — your data stays on this device",
                             style = AegisType.small,
                             modifier = Modifier.padding(top = 2.dp),
                         )
@@ -195,6 +197,15 @@ fun SettingsScreen(vm: AppViewModel, nav: Navigator, activity: FragmentActivity)
                     onClick = { sheet = SettingsSheet.BACKUP },
                 )
                 SettingsRow(
+                    icon = R.drawable.ic_cloud,
+                    title = "Cloud backup",
+                    subtitle = "End-to-end encrypted",
+                    value = if (cloudState.enabled) "On" else "Off",
+                    onClick = {
+                        sheet = if (cloudState.enabled) SettingsSheet.CLOUD else SettingsSheet.CLOUD_SETUP
+                    },
+                )
+                SettingsRow(
                     icon = R.drawable.ic_hard_drive,
                     title = "Storage",
                     subtitle = "This device · encrypted",
@@ -275,6 +286,8 @@ fun SettingsScreen(vm: AppViewModel, nav: Navigator, activity: FragmentActivity)
         SettingsSheet.ABOUT -> AboutSheet(onDismiss = { sheet = null })
         SettingsSheet.HELP -> HelpSheet(onDismiss = { sheet = null })
         SettingsSheet.MASTER -> ChangeMasterSheet(vm = vm, onDismiss = { sheet = null })
+        SettingsSheet.CLOUD_SETUP -> CloudSetupSheet(vm = vm, onDismiss = { sheet = null })
+        SettingsSheet.CLOUD -> CloudSheet(vm = vm, onDismiss = { sheet = null })
         SettingsSheet.IMPORT_PASSWORD -> {
             val uri = pendingImport
             if (uri != null) {

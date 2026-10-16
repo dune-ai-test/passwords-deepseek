@@ -54,6 +54,7 @@ import com.aegis.vault.ui.screens.DevGalleryScreen
 import com.aegis.vault.ui.screens.EditItemScreen
 import com.aegis.vault.ui.screens.GeneratorScreen
 import com.aegis.vault.ui.screens.OnboardingScreen
+import com.aegis.vault.ui.screens.RestoreCloudScreen
 import com.aegis.vault.ui.screens.SearchScreen
 import com.aegis.vault.ui.screens.SecurityScreen
 import com.aegis.vault.ui.screens.SettingsScreen
@@ -102,7 +103,7 @@ fun AegisApp(vm: AppViewModel, activity: FragmentActivity) {
     Box(Modifier.fillMaxSize().background(AegisColors.bg)) {
         when (stage) {
             AppViewModel.Stage.FIRST_RUN -> FirstRunFlow(vm, activity)
-            AppViewModel.Stage.LOCKED -> UnlockScreen(vm, activity)
+            AppViewModel.Stage.LOCKED -> LockedFlow(vm, activity)
             AppViewModel.Stage.UNLOCKED -> MainShell(vm, activity)
             AppViewModel.Stage.DECOY -> FakeVaultShell(vm)
         }
@@ -130,14 +131,20 @@ private fun FirstRunFlow(vm: AppViewModel, activity: FragmentActivity) {
     } else {
         OnboardingScreen(
             onCreate = { creating = true },
-            onUnlock = {
-                if (vm.vaultExists()) {
-                    vm.showUnlock()
-                } else {
-                    vm.toast("No vault found on this device")
-                }
-            },
+            // Always to the unlock screen: on a fresh device the "Restore from
+            // cloud" link there is the way back in with an existing account.
+            onUnlock = { vm.showUnlock() },
         )
+    }
+}
+
+@Composable
+private fun LockedFlow(vm: AppViewModel, activity: FragmentActivity) {
+    var restoring by remember { mutableStateOf(false) }
+    if (restoring) {
+        RestoreCloudScreen(vm, onBack = { restoring = false })
+    } else {
+        UnlockScreen(vm, activity, onRestoreCloud = { restoring = true })
     }
 }
 

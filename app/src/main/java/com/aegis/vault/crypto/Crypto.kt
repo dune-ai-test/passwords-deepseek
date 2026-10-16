@@ -64,6 +64,15 @@ object Crypto {
         null
     }
 
+    /** Unpadded base64url — the wire format of the cloud API (URL/JSON safe). */
+    fun b64Url(bytes: ByteArray): String = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+
+    fun unb64Url(text: String): ByteArray? = try {
+        Base64.getUrlDecoder().decode(text)
+    } catch (e: IllegalArgumentException) {
+        null
+    }
+
     fun wipe(bytes: ByteArray?) {
         bytes?.fill(0)
     }

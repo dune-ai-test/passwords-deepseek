@@ -148,7 +148,7 @@ fun AboutSheet(onDismiss: () -> Unit) {
             )
             Spacer(Modifier.height(12.dp))
             AText(
-                "A local-only password manager. Everything is encrypted on this device and never leaves it.",
+                "A zero-knowledge password manager. Everything is encrypted on this device — with cloud backup on, the server only ever stores ciphertext.",
                 style = AegisType.small,
                 textAlign = TextAlign.Center,
             )
@@ -190,6 +190,14 @@ fun HelpSheet(onDismiss: () -> Unit) {
         HelpItem(
             "Backups",
             "Settings → Export to file writes an encrypted copy. Restore it any time from Settings → Local backup.",
+        )
+        HelpItem(
+            "Cloud backup",
+            "Turn it on under Settings → Cloud backup. Your vault is encrypted before upload — even the server can't read it. Restore it on a new phone from the unlock screen.",
+        )
+        HelpItem(
+            "Send to PC",
+            "Open the Aegis share page in a browser on your computer, type the 6-character code it shows, then check that both screens display the same key. One item only, encrypted end to end.",
         )
         HelpItem(
             "Auto-lock",

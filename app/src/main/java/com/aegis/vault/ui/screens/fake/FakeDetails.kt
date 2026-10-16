@@ -68,6 +68,8 @@ import com.aegis.vault.ui.design.darken
 import com.aegis.vault.ui.design.pressable
 import com.aegis.vault.ui.openUrl
 import com.aegis.vault.ui.safeFileName
+import com.aegis.vault.ui.screens.SendToPcAction
+import com.aegis.vault.ui.screens.ShareToPcSheet
 import com.aegis.vault.ui.shareText
 import com.aegis.vault.ui.shareTextFile
 import com.aegis.vault.ui.writeTextToUri
@@ -177,6 +179,7 @@ private fun FakeLoginDetail(vm: AppViewModel, nav: FakeNavigator, state: FakeVau
     var revealed by remember { mutableStateOf(false) }
     var historyOpen by remember { mutableStateOf(false) }
     var confirmShare by remember { mutableStateOf(false) }
+    var sendToPc by remember { mutableStateOf(false) }
     val chevronRotation by animateFloatAsState(
         targetValue = if (historyOpen) 180f else 0f,
         label = "historyChevron",
@@ -285,6 +288,8 @@ private fun FakeLoginDetail(vm: AppViewModel, nav: FakeNavigator, state: FakeVau
 
             Spacer(Modifier.height(14.dp))
             AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
+                SendToPcAction { sendToPc = true }
+                AegisDivider(startPadding = 62.dp)
                 ActionRow(
                     icon = R.drawable.ic_share_2,
                     label = "Share login",
@@ -373,6 +378,10 @@ private fun FakeLoginDetail(vm: AppViewModel, nav: FakeNavigator, state: FakeVau
             onDismiss = { confirmShare = false },
         )
     }
+
+    if (sendToPc) {
+        ShareToPcSheet(vm = vm, item = item, fake = true, onDismiss = { sendToPc = false })
+    }
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -384,6 +393,7 @@ private fun FakeCardDetail(vm: AppViewModel, nav: FakeNavigator, state: FakeVaul
     val context = LocalContext.current
     var revealed by remember { mutableStateOf(false) }
     var confirmShare by remember { mutableStateOf(false) }
+    var sendToPc by remember { mutableStateOf(false) }
 
     val brand = Brands.cardBrand(item.number)
     val digits = item.number.filter { it.isDigit() }
@@ -539,6 +549,8 @@ private fun FakeCardDetail(vm: AppViewModel, nav: FakeNavigator, state: FakeVaul
 
             Spacer(Modifier.height(14.dp))
             AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
+                SendToPcAction { sendToPc = true }
+                AegisDivider(startPadding = 62.dp)
                 ActionRow(
                     icon = R.drawable.ic_share_2,
                     label = "Share card details",
@@ -573,6 +585,10 @@ private fun FakeCardDetail(vm: AppViewModel, nav: FakeNavigator, state: FakeVaul
             onDismiss = { confirmShare = false },
         )
     }
+
+    if (sendToPc) {
+        ShareToPcSheet(vm = vm, item = item, fake = true, onDismiss = { sendToPc = false })
+    }
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -582,6 +598,7 @@ private fun FakeCardDetail(vm: AppViewModel, nav: FakeNavigator, state: FakeVaul
 @Composable
 private fun FakeNoteDetail(vm: AppViewModel, nav: FakeNavigator, state: FakeVaultState, item: NoteItem) {
     val context = LocalContext.current
+    var sendToPc by remember { mutableStateOf(false) }
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/plain")
     ) { uri ->
@@ -650,6 +667,8 @@ private fun FakeNoteDetail(vm: AppViewModel, nav: FakeNavigator, state: FakeVaul
 
             Spacer(Modifier.height(14.dp))
             AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
+                SendToPcAction { sendToPc = true }
+                AegisDivider(startPadding = 62.dp)
                 ActionRow(
                     icon = R.drawable.ic_file_text,
                     label = "Export to file",
@@ -665,6 +684,10 @@ private fun FakeNoteDetail(vm: AppViewModel, nav: FakeNavigator, state: FakeVaul
             Spacer(Modifier.height(24.dp))
         }
     }
+
+    if (sendToPc) {
+        ShareToPcSheet(vm = vm, item = item, fake = true, onDismiss = { sendToPc = false })
+    }
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -674,6 +697,7 @@ private fun FakeNoteDetail(vm: AppViewModel, nav: FakeNavigator, state: FakeVaul
 @Composable
 private fun FakeIdentityDetail(vm: AppViewModel, nav: FakeNavigator, state: FakeVaultState, item: IdentityItem) {
     val context = LocalContext.current
+    var sendToPc by remember { mutableStateOf(false) }
 
     Column(
         Modifier
@@ -753,6 +777,8 @@ private fun FakeIdentityDetail(vm: AppViewModel, nav: FakeNavigator, state: Fake
 
             Spacer(Modifier.height(14.dp))
             AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
+                SendToPcAction { sendToPc = true }
+                AegisDivider(startPadding = 62.dp)
                 ActionRow(
                     icon = R.drawable.ic_share_2,
                     label = "Share identity",
@@ -776,11 +802,15 @@ private fun FakeIdentityDetail(vm: AppViewModel, nav: FakeNavigator, state: Fake
 
             Spacer(Modifier.height(14.dp))
             InfoNote(
-                "Stored only on this device. Aegis never uploads identity details anywhere.",
+                "Stored encrypted on this device. With cloud backup on, only the encrypted vault ever leaves your phone.",
                 icon = R.drawable.ic_lock,
                 modifier = Modifier.padding(horizontal = 20.dp),
             )
             Spacer(Modifier.height(24.dp))
         }
+    }
+
+    if (sendToPc) {
+        ShareToPcSheet(vm = vm, item = item, fake = true, onDismiss = { sendToPc = false })
     }
 }

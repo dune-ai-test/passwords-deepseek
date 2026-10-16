@@ -238,7 +238,7 @@ fun SecurityScreen(vm: AppViewModel, nav: Navigator) {
 
             Spacer(Modifier.height(14.dp))
             InfoNote(
-                text = "The audit runs entirely on this device. Nothing is uploaded, ever.",
+                text = "The audit runs entirely on this device — your passwords are never sent anywhere.",
                 icon = R.drawable.ic_lock,
                 modifier = Modifier.padding(horizontal = 20.dp),
             )

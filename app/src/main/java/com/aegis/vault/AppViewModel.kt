@@ -10,6 +10,9 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.aegis.vault.crypto.BiometricKeys
+import com.aegis.vault.crypto.CloudKeys
+import com.aegis.vault.crypto.Crypto
+import com.aegis.vault.crypto.ShareCrypto
 import com.aegis.vault.data.CardItem
 import com.aegis.vault.data.IdentityItem
 import com.aegis.vault.data.LoginItem
@@ -20,9 +23,14 @@ import com.aegis.vault.data.VaultItem
 import com.aegis.vault.data.VaultRepository
 import com.aegis.vault.data.VaultSettings
 import com.aegis.vault.data.Wordlist
+import com.aegis.vault.sync.CloudClient
+import com.aegis.vault.sync.CloudSyncStore
+import com.aegis.vault.sync.SharePayload
 import com.aegis.vault.ui.Biometric
 import javax.crypto.Cipher
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -149,6 +157,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun lock() {
+        // Flush pending changes to the cloud while the vault key is still in
+        // memory-friendly territory; the file on disk is already written.
+        if (cloud.enabled && cloudGeneration != cloudSyncedGeneration) {
+            viewModelScope.launch { cloudBackupQuiet() }
+        }
         cacheSettings(_vault.value)
         repo.lock()
         _vault.value = null
@@ -169,9 +182,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             repo.wipeEverything()
             refreshVaultBytes()
             BiometricKeys.delete()
+            val hadCloud = cloud.enabled
+            if (hadCloud) {
+                // The local device forgets the account; the encrypted copy
+                // stays on the server so the user can still restore it.
+                cloud.disable()
+                cloudSyncedGeneration = cloudGeneration
+                refreshCloudState()
+            }
             _vault.value = null
             _stage.value = Stage.FIRST_RUN
-            toast("Vault erased from this device")
+            toast(if (hadCloud) "Vault erased — cloud backup turned off" else "Vault erased from this device")
         }
     }
 
@@ -428,12 +449,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         lastKnownSettings = updated.settings
         repo.persist(updated)
         refreshVaultBytes()
+        noteCloudChange()
     }
 
     private fun persist(data: VaultData) {
         viewModelScope.launch {
             repo.persist(data)
             refreshVaultBytes()
+            noteCloudChange()
         }
     }
 
@@ -444,17 +467,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _busyText.value = "Updating master password…"
             _busy.value = true
             val result = repo.changeMasterPassword(current.toCharArray(), next.toCharArray())
-            _busy.value = false
             refreshVaultBytes()
             when (result) {
                 VaultRepository.PasswordChangeResult.SUCCESS -> {
-                    toast("Master password updated")
+                    var message: String? = null
+                    if (cloud.enabled && cloud.hasCredentials()) {
+                        _busyText.value = "Re-linking cloud backup…"
+                        message = performCloudRelink(next)
+                    }
+                    _busy.value = false
+                    noteCloudChange()
+                    toast(message ?: "Master password updated")
                     onResult(null)
                 }
-                VaultRepository.PasswordChangeResult.WRONG_PASSWORD ->
+                VaultRepository.PasswordChangeResult.WRONG_PASSWORD -> {
+                    _busy.value = false
                     onResult("Current password is incorrect")
-                VaultRepository.PasswordChangeResult.ERROR ->
+                }
+                VaultRepository.PasswordChangeResult.ERROR -> {
+                    _busy.value = false
                     onResult("Couldn't update the master password")
+                }
             }
         }
     }
@@ -514,6 +547,576 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 onResult(null)
             }
         }
+    }
+
+    /* ── Cloud backup ─────────────────────────────────────────────────────── */
+
+    /** UI-facing cloud state for the Settings sheet. */
+    data class CloudUiState(
+        val enabled: Boolean = false,
+        val busy: Boolean = false,
+        val lastBackupAt: Long? = null,
+        val serverUrl: String = CloudSyncStore.DEFAULT_SERVER,
+        val error: String? = null,
+    )
+
+    private val cloud = CloudSyncStore(app)
+
+    private val _cloudState = MutableStateFlow(
+        CloudUiState(
+            enabled = cloud.enabled,
+            lastBackupAt = cloud.lastBackupAt.takeIf { it > 0 },
+            serverUrl = cloud.serverUrl,
+        )
+    )
+    val cloudState: StateFlow<CloudUiState> = _cloudState.asStateFlow()
+
+    /** True while the enable flow waits for the "replace existing backup?" answer. */
+    private val _cloudEnableConfirm = MutableStateFlow(false)
+    val cloudEnableConfirm: StateFlow<Boolean> = _cloudEnableConfirm.asStateFlow()
+
+    /** True while a manual backup waits for the "overwrite the newer copy?" answer. */
+    private val _cloudReplaceConfirm = MutableStateFlow(false)
+    val cloudReplaceConfirm: StateFlow<Boolean> = _cloudReplaceConfirm.asStateFlow()
+
+    private var cloudEnableDeferred: CompletableDeferred<Boolean>? = null
+    private var cloudReplaceDeferred: CompletableDeferred<Boolean>? = null
+
+    /** Every local change bumps the generation; the last uploaded one is tracked. */
+    private var cloudGeneration = 0L
+    private var cloudSyncedGeneration = 0L
+    private var cloudBackupInFlight = false
+    private var cloudDebounceJob: Job? = null
+
+    private var pendingShareCode: String? = null
+    private var pendingSharePcPub: ByteArray? = null
+
+    fun cloudServerDefault(): String = cloud.serverUrl
+
+    fun cloudConfigured(): Boolean = cloud.enabled && cloud.hasCredentials()
+
+    private fun refreshCloudState() {
+        val current = _cloudState.value
+        _cloudState.value = current.copy(
+            enabled = cloud.enabled,
+            lastBackupAt = cloud.lastBackupAt.takeIf { it > 0 },
+            serverUrl = cloud.serverUrl,
+        )
+    }
+
+    private sealed interface BackupOutcome {
+        data object Success : BackupOutcome
+        data object Conflict : BackupOutcome
+        data class Failure(val message: String) : BackupOutcome
+    }
+
+    /**
+     * Upload the current vault file. Without [force] a newer remote copy is
+     * never overwritten (409 → Conflict). Forced writes happen only from the
+     * manual flow after the user confirms; the server keeps the old revision
+     * in its history.
+     */
+    private suspend fun performBackup(force: Boolean): BackupOutcome {
+        val token = cloud.ensureToken()
+            ?: return BackupOutcome.Failure("Cloud sign-in failed — turn cloud backup off and on again")
+        val bytes = repo.exportBytes() ?: return BackupOutcome.Failure("Nothing to back up yet")
+        val client = cloud.client()
+        val blob = String(bytes, Charsets.UTF_8)
+
+        val put = client.putVault(token, blob, cloud.revision)
+            ?: return BackupOutcome.Failure("Couldn't reach the server")
+        when (put.status) {
+            200 -> {
+                cloud.markBackedUp(put.revision ?: cloud.revision + 1)
+                refreshCloudState()
+                return BackupOutcome.Success
+            }
+            401 -> return BackupOutcome.Failure("Cloud sign-in expired — reconnect in Settings")
+            409 -> {
+                if (!force) return BackupOutcome.Conflict
+                val serverRevision = put.revision ?: 0
+                val forced = client.putVault(token, blob, serverRevision)
+                    ?: return BackupOutcome.Failure("Couldn't reach the server")
+                if (forced.status == 200) {
+                    cloud.markBackedUp(forced.revision ?: serverRevision + 1)
+                    refreshCloudState()
+                    return BackupOutcome.Success
+                }
+                return BackupOutcome.Failure("Backup failed (${forced.status})")
+            }
+            else -> return BackupOutcome.Failure("Backup failed (${put.status})")
+        }
+    }
+
+    /** Manual "Back up now" from the cloud sheet — with visible progress and dialogs. */
+    fun cloudBackupNow() {
+        if (!cloud.enabled) {
+            toast("Cloud backup is off")
+            return
+        }
+        viewModelScope.launch {
+            _cloudState.value = _cloudState.value.copy(busy = true, error = null)
+            var outcome: BackupOutcome? = performBackup(force = false)
+            if (outcome is BackupOutcome.Conflict) {
+                // Drop the busy overlay so the confirm dialog isn't covered.
+                _cloudState.value = _cloudState.value.copy(busy = false)
+                cloudReplaceDeferred = CompletableDeferred()
+                _cloudReplaceConfirm.value = true
+                val proceed = cloudReplaceDeferred?.await() ?: false
+                _cloudReplaceConfirm.value = false
+                cloudReplaceDeferred = null
+                outcome = if (proceed) {
+                    _cloudState.value = _cloudState.value.copy(busy = true)
+                    performBackup(force = true)
+                } else {
+                    null
+                }
+            }
+            when (outcome) {
+                is BackupOutcome.Success -> {
+                    _cloudState.value = _cloudState.value.copy(error = null)
+                    toast("Vault backed up")
+                }
+                is BackupOutcome.Failure -> {
+                    _cloudState.value = _cloudState.value.copy(error = outcome.message)
+                    toast(outcome.message)
+                }
+                is BackupOutcome.Conflict -> Unit // handled above
+                null -> Unit // user cancelled
+            }
+            _cloudState.value = _cloudState.value.copy(busy = false)
+        }
+    }
+
+    fun answerCloudEnable(proceed: Boolean) {
+        cloudEnableDeferred?.takeIf { !it.isCompleted }?.complete(proceed)
+    }
+
+    fun answerCloudReplace(proceed: Boolean) {
+        cloudReplaceDeferred?.takeIf { !it.isCompleted }?.complete(proceed)
+    }
+
+    /**
+     * Turns cloud backup on: derives the cloud credentials from the master
+     * password, registers/logs in, and uploads the encrypted vault. When the
+     * account already has a vault, asks before replacing it.
+     */
+    fun cloudEnable(password: String, server: String) {
+        if (password.isBlank()) return
+        viewModelScope.launch {
+            _busyText.value = "Preparing encrypted backup…"
+            _busy.value = true
+            try {
+                val normalizedServer = CloudSyncStore.normalizeServer(server)
+                val creds = withContext(Dispatchers.Default) {
+                    CloudKeys.derive(password.toCharArray())
+                }
+                val client = CloudClient(normalizedServer)
+
+                _busyText.value = "Creating your cloud account…"
+                val register = client.register(creds.accountId, creds.authKey)
+                when {
+                    register == null -> {
+                        toast("Couldn't reach the server — check the URL and your connection")
+                        return@launch
+                    }
+                    register.status == 200 || register.status == 409 -> Unit
+                    register.status == 429 -> {
+                        toast("Too many attempts — try again later")
+                        return@launch
+                    }
+                    else -> {
+                        toast("Setup failed (${register.status})")
+                        return@launch
+                    }
+                }
+
+                _busyText.value = "Signing in…"
+                val login = client.login(creds.accountId, creds.authKey)
+                if (login == null) {
+                    toast("Couldn't reach the server")
+                    return@launch
+                }
+                if (login.status != 200) {
+                    toast("Setup failed (${login.status})")
+                    return@launch
+                }
+                val token = login.token
+                if (token == null) {
+                    toast("Setup failed (unexpected response)")
+                    return@launch
+                }
+
+                _busyText.value = "Checking the cloud copy…"
+                val current = client.getVault(token)
+                if (current == null) {
+                    toast("Couldn't reach the server")
+                    return@launch
+                }
+                val remoteRevision = if (current.status == 200) (current.revision ?: 0) else 0
+                if (remoteRevision > 0) {
+                    _busy.value = false
+                    cloudEnableDeferred = CompletableDeferred()
+                    _cloudEnableConfirm.value = true
+                    val proceed = cloudEnableDeferred?.await() ?: false
+                    _cloudEnableConfirm.value = false
+                    cloudEnableDeferred = null
+                    if (!proceed) return@launch
+                    _busyText.value = "Uploading your vault…"
+                    _busy.value = true
+                }
+
+                val bytes = repo.exportBytes()
+                if (bytes == null) {
+                    toast("Nothing to back up yet")
+                    return@launch
+                }
+                val put = client.putVault(token, String(bytes, Charsets.UTF_8), remoteRevision)
+                if (put == null) {
+                    toast("Couldn't reach the server")
+                    return@launch
+                }
+                when (put.status) {
+                    200 -> Unit
+                    409 -> {
+                        toast("The cloud copy changed — try again")
+                        return@launch
+                    }
+                    else -> {
+                        toast("Upload failed (${put.status})")
+                        return@launch
+                    }
+                }
+
+                cloud.enabled = true
+                cloud.serverUrl = normalizedServer
+                cloud.accountId = creds.accountId
+                cloud.authKey = creds.authKey
+                cloud.saveSession(token, login.expiresAt ?: 0L)
+                cloud.markBackedUp(put.revision ?: remoteRevision + 1)
+                cloudSyncedGeneration = cloudGeneration
+                refreshCloudState()
+                _cloudState.value = _cloudState.value.copy(error = null)
+                toast("Cloud backup is on — vault uploaded")
+            } finally {
+                _busy.value = false
+            }
+        }
+    }
+
+    /**
+     * Restores the encrypted vault from the cloud (unlock screen). Runs two
+     * key derivations on old phones — the cloud-seed PBKDF2 here, and the
+     * envelope PBKDF2 inside [VaultRepository.importFrom].
+     */
+    fun restoreFromCloud(password: String, server: String, onResult: (String?) -> Unit) {
+        if (password.isBlank()) {
+            onResult("Enter your master password")
+            return
+        }
+        viewModelScope.launch {
+            _busyText.value = "Deriving keys — this can take a minute…"
+            _busy.value = true
+            try {
+                val normalizedServer = CloudSyncStore.normalizeServer(server)
+                val creds = withContext(Dispatchers.Default) {
+                    CloudKeys.derive(password.toCharArray())
+                }
+                val client = CloudClient(normalizedServer)
+
+                val login = client.login(creds.accountId, creds.authKey)
+                when {
+                    login == null -> {
+                        onResult("Couldn't reach the server — check your connection")
+                        return@launch
+                    }
+                    login.status == 401 -> {
+                        onResult("No cloud backup found for this master password")
+                        return@launch
+                    }
+                    login.status == 429 -> {
+                        onResult("Too many attempts — wait a few minutes")
+                        return@launch
+                    }
+                    login.status != 200 -> {
+                        onResult("Restore failed (${login.status})")
+                        return@launch
+                    }
+                }
+                val token = login.token
+                if (token == null) {
+                    onResult("Restore failed (unexpected response)")
+                    return@launch
+                }
+
+                _busyText.value = "Downloading the encrypted backup…"
+                val remote = client.getVault(token)
+                when {
+                    remote == null -> {
+                        onResult("Couldn't reach the server")
+                        return@launch
+                    }
+                    remote.status == 404 -> {
+                        onResult("No cloud backup found for this master password")
+                        return@launch
+                    }
+                    remote.status != 200 -> {
+                        onResult("Restore failed (${remote.status})")
+                        return@launch
+                    }
+                }
+                val blob = remote.blob
+                if (blob.isNullOrBlank()) {
+                    onResult("The cloud backup is empty")
+                    return@launch
+                }
+
+                _busyText.value = "Decrypting your vault…"
+                val data = repo.importFrom(blob.toByteArray(Charsets.UTF_8), password.toCharArray())
+                if (data == null) {
+                    onResult("The backup couldn't be decrypted with this password")
+                    return@launch
+                }
+
+                cloud.enabled = true
+                cloud.serverUrl = normalizedServer
+                cloud.accountId = creds.accountId
+                cloud.authKey = creds.authKey
+                cloud.saveSession(token, login.expiresAt ?: 0L)
+                cloud.revision = remote.revision ?: 0
+                cloud.lastBackupAt = remote.updatedAt ?: System.currentTimeMillis()
+                cloudSyncedGeneration = cloudGeneration
+                refreshCloudState()
+                _cloudState.value = _cloudState.value.copy(error = null)
+                _vault.value = data
+                cacheSettings(data)
+                refreshVaultBytes()
+                lastInteraction = System.currentTimeMillis()
+                _stage.value = Stage.UNLOCKED
+                toast("Vault restored from cloud")
+                onResult(null)
+            } finally {
+                _busy.value = false
+            }
+        }
+    }
+
+    /**
+     * Turns cloud backup off. With [deleteRemote] the encrypted copy is
+     * deleted from the server first — and if that fails, nothing is changed
+     * locally, so the user can retry instead of silently keeping an orphan.
+     */
+    fun cloudDisable(deleteRemote: Boolean) {
+        viewModelScope.launch {
+            if (!deleteRemote) {
+                cloud.disable()
+                cloudSyncedGeneration = cloudGeneration
+                refreshCloudState()
+                _cloudState.value = _cloudState.value.copy(error = null)
+                toast("Cloud backup turned off")
+                return@launch
+            }
+            _cloudState.value = _cloudState.value.copy(busy = true)
+            try {
+                val token = cloud.ensureToken()
+                if (token == null) {
+                    toast("Couldn't sign in — nothing was deleted")
+                    return@launch
+                }
+                val response = cloud.client().deleteAccount(token)
+                if (response == null) {
+                    toast("Couldn't reach the server — nothing was deleted")
+                    return@launch
+                }
+                if (response.status != 200 && response.status != 404) {
+                    toast("Delete failed (${response.status}) — nothing was deleted")
+                    return@launch
+                }
+                cloud.disable()
+                cloudSyncedGeneration = cloudGeneration
+                refreshCloudState()
+                _cloudState.value = _cloudState.value.copy(error = null)
+                toast("Cloud copy deleted — cloud backup is off")
+            } finally {
+                _cloudState.value = _cloudState.value.copy(busy = false)
+            }
+        }
+    }
+
+    /** Queue a debounced background backup after a vault change. */
+    private fun noteCloudChange() {
+        if (!cloud.enabled || !cloud.hasCredentials()) return
+        cloudGeneration++
+        cloudDebounceJob?.cancel()
+        cloudDebounceJob = viewModelScope.launch {
+            delay(8_000)
+            cloudBackupQuiet()
+        }
+    }
+
+    /** Debounced backup — silent: problems only land in [CloudUiState.error]. */
+    private suspend fun cloudBackupQuiet() {
+        if (!cloud.enabled || !cloud.hasCredentials()) return
+        if (cloudBackupInFlight) {
+            // A backup is already running; make sure the newest change still
+            // gets a chance after it finishes.
+            cloudDebounceJob?.cancel()
+            cloudDebounceJob = viewModelScope.launch {
+                delay(8_000)
+                cloudBackupQuiet()
+            }
+            return
+        }
+        if (cloudGeneration == cloudSyncedGeneration) return
+        val target = cloudGeneration
+        cloudBackupInFlight = true
+        try {
+            when (val outcome = performBackup(force = false)) {
+                is BackupOutcome.Success -> {
+                    if (target == cloudGeneration) cloudSyncedGeneration = target
+                    _cloudState.value = _cloudState.value.copy(error = null)
+                    if (cloudGeneration != cloudSyncedGeneration) {
+                        cloudDebounceJob?.cancel()
+                        cloudDebounceJob = viewModelScope.launch {
+                            delay(2_000)
+                            cloudBackupQuiet()
+                        }
+                    }
+                }
+                is BackupOutcome.Conflict ->
+                    _cloudState.value = _cloudState.value.copy(error = "A newer backup exists on another device")
+                is BackupOutcome.Failure ->
+                    _cloudState.value = _cloudState.value.copy(error = outcome.message)
+            }
+        } finally {
+            cloudBackupInFlight = false
+        }
+    }
+
+    /**
+     * Moves the cloud account to credentials derived from the new master
+     * password. Authenticates with the stored (old) credentials, so the old
+     * password never needs re-deriving. On failure cloud backup is turned off
+     * locally — the vault itself is untouched.
+     */
+    private suspend fun performCloudRelink(nextPassword: String): String? {
+        val oldAccountId = cloud.accountId
+        val oldAuthKey = cloud.authKey
+        if (oldAccountId == null || oldAuthKey == null) return null
+
+        val newCreds = withContext(Dispatchers.Default) {
+            CloudKeys.derive(nextPassword.toCharArray())
+        }
+        val client = cloud.client()
+        val relink = client.relink(oldAccountId, oldAuthKey, newCreds.accountId, newCreds.authKey)
+        if (relink == null || relink.status != 200) {
+            cloud.disable()
+            cloudSyncedGeneration = cloudGeneration
+            refreshCloudState()
+            return "Password updated — cloud backup was turned off. Set it up again in Settings"
+        }
+        val login = client.login(newCreds.accountId, newCreds.authKey)
+        if (login == null || login.status != 200 || login.token == null) {
+            cloud.disable()
+            cloudSyncedGeneration = cloudGeneration
+            refreshCloudState()
+            return "Password updated — cloud backup was turned off. Set it up again in Settings"
+        }
+        cloud.accountId = newCreds.accountId
+        cloud.authKey = newCreds.authKey
+        cloud.saveSession(login.token, login.expiresAt ?: 0L)
+        refreshCloudState()
+        return null
+    }
+
+    /* ── Send to PC (one-time share) ──────────────────────────────────────── */
+
+    /**
+     * Step 1: look the PC's one-time code up and return its fingerprint for
+     * the visual comparison on both screens.
+     */
+    fun shareToPcLookup(codeInput: String, onResult: (fingerprint: String?, error: String?) -> Unit) {
+        val code = ShareCrypto.normalizeCode(codeInput)
+        if (code == null) {
+            onResult(null, "Enter the 6-character code from your PC")
+            return
+        }
+        viewModelScope.launch {
+            val response = withContext(Dispatchers.IO) {
+                CloudClient(cloud.serverUrl).relayLookup(code)
+            }
+            when {
+                response == null -> onResult(null, "Couldn't reach the server — check your connection")
+                response.status == 404 -> onResult(null, "Code not found or expired — check the PC screen")
+                response.status == 429 -> onResult(null, "Too many attempts — wait a minute and try again")
+                response.status != 200 -> onResult(null, "Lookup failed (${response.status})")
+                else -> {
+                    val pcPub = response.pcPub?.let { Crypto.unb64Url(it) }
+                    if (pcPub == null || pcPub.size != 65) {
+                        onResult(null, "The PC sent an unexpected key")
+                        return@launch
+                    }
+                    pendingShareCode = code
+                    pendingSharePcPub = pcPub
+                    onResult(ShareCrypto.fingerprint(pcPub), null)
+                }
+            }
+        }
+    }
+
+    /**
+     * Step 2: encrypt just the selected item to the PC's key and upload it.
+     * The relay stores it until the PC fetches it once (or it expires).
+     */
+    fun shareToPcSend(item: VaultItem, onResult: (String?) -> Unit) {
+        val code = pendingShareCode
+        val pcPub = pendingSharePcPub
+        if (code == null || pcPub == null) {
+            onResult("Start over — the code may have expired")
+            return
+        }
+        viewModelScope.launch {
+            val payload = SharePayload.forItem(item)
+            val sealed = withContext(Dispatchers.Default) {
+                ShareCrypto.sealToPc(pcPub, payload.toByteArray(Charsets.UTF_8))
+            }
+            if (sealed == null) {
+                onResult("Couldn't encrypt the item")
+                return@launch
+            }
+            val senderPub = Crypto.b64Url(sealed.senderPublicKey)
+            val nonce = Crypto.b64Url(sealed.nonce)
+            val ciphertext = Crypto.b64Url(sealed.ciphertext)
+            if (ciphertext.length > 6000) {
+                onResult("This item is too large to send")
+                return@launch
+            }
+            val response = withContext(Dispatchers.IO) {
+                CloudClient(cloud.serverUrl).relayUpload(
+                    code = code,
+                    senderPub = senderPub,
+                    nonce = nonce,
+                    ciphertext = ciphertext,
+                )
+            }
+            when {
+                response == null -> onResult("Couldn't reach the server — check your connection")
+                response.status == 404 -> onResult("The code expired — start again")
+                response.status == 409 -> onResult("That code was already used")
+                response.status == 429 -> onResult("Too many attempts — wait a minute")
+                response.status == 200 -> {
+                    pendingShareCode = null
+                    pendingSharePcPub = null
+                    onResult(null)
+                }
+                else -> onResult("Sending failed (${response.status})")
+            }
+        }
+    }
+
+    fun shareCancel() {
+        pendingShareCode = null
+        pendingSharePcPub = null
     }
 
     /* ── Clipboard & toasts ───────────────────────────────────────────────── */

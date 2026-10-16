@@ -1,0 +1,33 @@
+name: Cloud tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cloud/**"
+      - ".github/workflows/cloud-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloud
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dev dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Syntax-check the Pages Functions
+        run: npm run check
+
+      - name: Run unit tests
+        run: npx vitest run

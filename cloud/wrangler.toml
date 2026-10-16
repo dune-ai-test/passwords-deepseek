@@ -1,0 +1,22 @@
+# Cloudflare Pages project for Aegis.
+#
+# One project hosts everything:
+#   /            → static share page (public/)
+#   /v1/*        → encrypted vault sync API  (functions/v1)   [D1-backed]
+#   /api/relay/* → one-time PC share relay   (functions/api/relay) [D1-backed]
+#
+# Setup (see README.md for the full walkthrough):
+#   1. npx wrangler d1 create aegis-db        → paste database_id below
+#   2. npx wrangler d1 execute aegis-db --remote --file=./schema.sql
+#   3. npx wrangler pages secret put SERVER_SECRET --project-name aegis-cloud
+#   4. npx wrangler pages deploy
+
+name = "aegis-cloud"
+pages_build_output_dir = "public"
+compatibility_date = "2025-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "aegis-db"
+# Replace with the id printed by `npx wrangler d1 create aegis-db`.
+database_id = "PASTE_YOUR_DATABASE_ID_HERE"

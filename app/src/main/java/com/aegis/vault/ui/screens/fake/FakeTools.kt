@@ -36,6 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -57,6 +59,7 @@ import com.aegis.vault.ui.design.AegisLinkText
 import com.aegis.vault.ui.design.AegisPasswordField
 import com.aegis.vault.ui.design.AegisSlider
 import com.aegis.vault.ui.design.AegisStepper
+import com.aegis.vault.ui.design.AegisTextField
 import com.aegis.vault.ui.design.AegisType
 import com.aegis.vault.ui.design.AText
 import com.aegis.vault.ui.design.AvatarBadge
@@ -85,6 +88,7 @@ import com.aegis.vault.ui.screens.HelpSheet
 import java.security.SecureRandom
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -461,7 +465,7 @@ fun FakeSecurityScreen(nav: FakeNavigator, state: FakeVaultState) {
 
             Spacer(Modifier.height(14.dp))
             InfoNote(
-                text = "The audit runs entirely on this device. Nothing is uploaded, ever.",
+                text = "The audit runs entirely on this device — your passwords are never sent anywhere.",
                 icon = R.drawable.ic_lock,
                 modifier = Modifier.padding(horizontal = 20.dp),
             )
@@ -662,7 +666,7 @@ private fun FakeRoundAction(icon: Int, tint: Color, onClick: () -> Unit) {
  * Settings
  * ──────────────────────────────────────────────────────────────────────────── */
 
-private enum class FakeSheet { AUTOLOCK, BACKUP, ABOUT, HELP, MASTER, IMPORT_PASSWORD }
+private enum class FakeSheet { AUTOLOCK, BACKUP, CLOUD, ABOUT, HELP, MASTER, IMPORT_PASSWORD }
 
 @Composable
 fun FakeSettingsScreen(vm: AppViewModel, nav: FakeNavigator, state: FakeVaultState) {
@@ -831,6 +835,13 @@ fun FakeSettingsScreen(vm: AppViewModel, nav: FakeNavigator, state: FakeVaultSta
                     onClick = { sheet = FakeSheet.BACKUP },
                 )
                 SettingsRow(
+                    icon = R.drawable.ic_cloud,
+                    title = "Cloud backup",
+                    subtitle = "End-to-end encrypted",
+                    value = "Off",
+                    onClick = { sheet = FakeSheet.CLOUD },
+                )
+                SettingsRow(
                     icon = R.drawable.ic_hard_drive,
                     title = "Storage",
                     subtitle = "This device · encrypted",
@@ -907,6 +918,7 @@ fun FakeSettingsScreen(vm: AppViewModel, nav: FakeNavigator, state: FakeVaultSta
             },
             onDismiss = { sheet = null },
         )
+        FakeSheet.CLOUD -> FakeCloudSheet(vm = vm, onDismiss = { sheet = null })
         FakeSheet.ABOUT -> AboutSheet(onDismiss = { sheet = null })
         FakeSheet.HELP -> HelpSheet(onDismiss = { sheet = null })
         FakeSheet.MASTER -> FakeChangeMasterSheet(vm = vm, onDismiss = { sheet = null })
@@ -1016,6 +1028,62 @@ private fun FakeImportPasswordSheet(onDismiss: () -> Unit) {
         InfoNote(
             "Restoring replaces the vault currently on this device.",
             icon = R.drawable.ic_triangle_alert,
+        )
+    }
+}
+
+/**
+ * Decoy twin of the real cloud setup. Identical look and wording, but the
+ * "server" is the phone itself: after a short pause the attempt fails the way
+ * a dead connection would — nothing is ever registered or uploaded.
+ */
+@Composable
+private fun FakeCloudSheet(vm: AppViewModel, onDismiss: () -> Unit) {
+    var password by remember { mutableStateOf("") }
+    var server by remember { mutableStateOf("https://aegis-cloud.pages.dev") }
+    var connecting by remember { mutableStateOf(false) }
+
+    if (connecting) {
+        LaunchedEffect(Unit) {
+            delay(1200)
+            connecting = false
+            vm.toast("Couldn't reach the server. Check your connection and try again.")
+        }
+    }
+
+    ModalSheet(onDismiss = onDismiss) {
+        SheetTitle("Cloud backup")
+        Spacer(Modifier.height(8.dp))
+        AText(
+            "Your vault is encrypted on this device before it is uploaded — the server only ever stores ciphertext and cannot read your data.",
+            style = AegisType.small,
+        )
+        Spacer(Modifier.height(16.dp))
+        AegisPasswordField(
+            value = password,
+            onValueChange = { password = it },
+            placeholder = "Master password",
+        )
+        Spacer(Modifier.height(12.dp))
+        AegisTextField(
+            value = server,
+            onValueChange = { server = it },
+            label = "Server",
+            leadingIcon = R.drawable.ic_cloud,
+            placeholder = "https://aegis-cloud.pages.dev",
+            keyboardType = KeyboardType.Uri,
+            imeAction = ImeAction.Done,
+        )
+        Spacer(Modifier.height(16.dp))
+        AegisButton(
+            text = if (connecting) "Connecting…" else "Turn on cloud backup",
+            enabled = password.isNotEmpty() && server.isNotBlank() && !connecting,
+            onClick = { connecting = true },
+        )
+        Spacer(Modifier.height(12.dp))
+        InfoNote(
+            "The first upload can take a minute — your password is being stretched into keys on this device. This never changes your master password.",
+            icon = R.drawable.ic_lock,
         )
     }
 }

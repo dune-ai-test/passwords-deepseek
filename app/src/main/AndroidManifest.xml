@@ -2,9 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!--
-        Aegis is fully offline: no permissions are declared at all —
-        not even INTERNET. Your vault never leaves the device.
+        Aegis stays zero-knowledge: the only permission is INTERNET, used
+        solely for the optional cloud backup (which uploads ciphertext only)
+        and the one-time "Send to PC" handoff. Nothing readable ever leaves
+        the device, and there is no analytics or tracking of any kind.
     -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="false"

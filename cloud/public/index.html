@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Aegis — Receive from phone</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="card">
+  <header>
+    <div class="logo">A</div>
+    <div>
+      <h1>Aegis</h1>
+      <p class="sub">Receive one item from your phone</p>
+    </div>
+  </header>
+
+  <section id="state-connect">
+    <p class="hint">
+      On your phone, open the vault, pick an item and tap <strong>Send to PC</strong>.
+      Then type this code into the app:
+    </p>
+    <div class="code" id="code">······</div>
+    <div class="fingerprint">
+      <span class="fp-label">Confirm your phone shows this key</span>
+      <span class="fp-value" id="fingerprint">····-····</span>
+    </div>
+    <div class="waiting"><span class="spinner"></span><span id="waiting-text">Waiting for your phone…</span></div>
+    <p class="fine">
+      The code works once and expires after 3 minutes. The relay only ever sees
+      encrypted data — even this server can't read the item.
+    </p>
+  </section>
+
+  <section id="state-item" hidden>
+    <div class="item-head">
+      <span class="badge" id="item-type">Item</span>
+      <h2 id="item-title">—</h2>
+    </div>
+    <div id="fields"></div>
+    <div id="notes-wrap" hidden>
+      <div class="notes-label">Notes</div>
+      <div class="notes" id="notes"></div>
+    </div>
+    <div class="countdown-row">
+      <span class="countdown">Clears in <span id="countdown">60s</span></span>
+      <button class="ghost" id="clear-now">Clear now</button>
+    </div>
+  </section>
+
+  <section id="state-cleared" hidden>
+    <div class="done">✓</div>
+    <h2>Cleared</h2>
+    <p class="hint">The item was wiped from this page and from the relay. You can close this tab.</p>
+    <button class="primary" id="restart-cleared">Send another item</button>
+  </section>
+
+  <section id="state-error" hidden>
+    <div class="done warn">!</div>
+    <h2 id="error-title">Something went wrong</h2>
+    <p class="hint" id="error-text">—</p>
+    <button class="primary" id="restart-error">Start again</button>
+  </section>
+</main>
+<footer>Aegis · zero-knowledge · nothing on this page is stored in readable form</footer>
+<script src="app.js"></script>
+</body>
+</html>

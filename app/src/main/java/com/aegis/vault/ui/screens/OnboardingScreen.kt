@@ -96,7 +96,7 @@ fun OnboardingScreen(onCreate: () -> Unit, onUnlock: () -> Unit) {
         )
         Spacer(Modifier.height(12.dp))
         AText(
-            "Aegis keeps your logins, cards and notes encrypted on this device — no accounts, no cloud.",
+            "Aegis keeps your logins, cards and notes encrypted on this device — no accounts, and cloud backup is optional.",
             style = AegisType.body.copy(color = AegisColors.inkSecondary),
             textAlign = TextAlign.Center,
         )
@@ -114,7 +114,7 @@ fun OnboardingScreen(onCreate: () -> Unit, onUnlock: () -> Unit) {
             tint = AegisColors.greenDeep,
             bg = AegisColors.greenSoft,
             title = "Encrypted on device",
-            text = "An AES-256 vault that never leaves your phone.",
+            text = "An AES-256 vault that's always encrypted — even while syncing.",
         )
         Spacer(Modifier.height(12.dp))
         FeatureCard(
@@ -279,7 +279,7 @@ fun CreateMasterScreen(vm: AppViewModel, activity: FragmentActivity, onBack: () 
  * ──────────────────────────────────────────────────────────────────────────── */
 
 @Composable
-fun UnlockScreen(vm: AppViewModel, activity: FragmentActivity) {
+fun UnlockScreen(vm: AppViewModel, activity: FragmentActivity, onRestoreCloud: () -> Unit) {
     var password by remember { mutableStateOf("") }
     var showForgot by remember { mutableStateOf(false) }
     val bioReady = remember { vm.biometricReady() }
@@ -348,6 +348,8 @@ fun UnlockScreen(vm: AppViewModel, activity: FragmentActivity) {
         }
         Spacer(Modifier.height(14.dp))
         AegisLinkText("Forgot master password?", onClick = { showForgot = true })
+        Spacer(Modifier.height(10.dp))
+        AegisLinkText("Restore from cloud", onClick = onRestoreCloud)
         Spacer(Modifier.height(30.dp))
     }
 

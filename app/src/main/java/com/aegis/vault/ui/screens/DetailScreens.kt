@@ -179,6 +179,7 @@ private fun LoginDetail(vm: AppViewModel, nav: Navigator, item: LoginItem) {
     var revealed by remember { mutableStateOf(false) }
     var historyOpen by remember { mutableStateOf(false) }
     var confirmShare by remember { mutableStateOf(false) }
+    var sendToPc by remember { mutableStateOf(false) }
     val chevronRotation by animateFloatAsState(
         targetValue = if (historyOpen) 180f else 0f,
         label = "historyChevron",
@@ -287,6 +288,8 @@ private fun LoginDetail(vm: AppViewModel, nav: Navigator, item: LoginItem) {
 
             Spacer(Modifier.height(14.dp))
             AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
+                SendToPcAction { sendToPc = true }
+                AegisDivider(startPadding = 62.dp)
                 ActionRow(
                     icon = R.drawable.ic_share_2,
                     label = "Share login",
@@ -374,6 +377,10 @@ private fun LoginDetail(vm: AppViewModel, nav: Navigator, item: LoginItem) {
             onDismiss = { confirmShare = false },
         )
     }
+
+    if (sendToPc) {
+        ShareToPcSheet(vm = vm, item = item, onDismiss = { sendToPc = false })
+    }
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -385,6 +392,7 @@ private fun CardDetail(vm: AppViewModel, nav: Navigator, item: CardItem) {
     val context = LocalContext.current
     var revealed by remember { mutableStateOf(false) }
     var confirmShare by remember { mutableStateOf(false) }
+    var sendToPc by remember { mutableStateOf(false) }
 
     val brand = Brands.cardBrand(item.number)
     val digits = item.number.filter { it.isDigit() }
@@ -540,6 +548,8 @@ private fun CardDetail(vm: AppViewModel, nav: Navigator, item: CardItem) {
 
             Spacer(Modifier.height(14.dp))
             AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
+                SendToPcAction { sendToPc = true }
+                AegisDivider(startPadding = 62.dp)
                 ActionRow(
                     icon = R.drawable.ic_share_2,
                     label = "Share card details",
@@ -573,6 +583,10 @@ private fun CardDetail(vm: AppViewModel, nav: Navigator, item: CardItem) {
             onDismiss = { confirmShare = false },
         )
     }
+
+    if (sendToPc) {
+        ShareToPcSheet(vm = vm, item = item, onDismiss = { sendToPc = false })
+    }
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -582,6 +596,7 @@ private fun CardDetail(vm: AppViewModel, nav: Navigator, item: CardItem) {
 @Composable
 private fun NoteDetail(vm: AppViewModel, nav: Navigator, item: NoteItem) {
     val context = LocalContext.current
+    var sendToPc by remember { mutableStateOf(false) }
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/plain")
     ) { uri ->
@@ -650,6 +665,8 @@ private fun NoteDetail(vm: AppViewModel, nav: Navigator, item: NoteItem) {
 
             Spacer(Modifier.height(14.dp))
             AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
+                SendToPcAction { sendToPc = true }
+                AegisDivider(startPadding = 62.dp)
                 ActionRow(
                     icon = R.drawable.ic_file_text,
                     label = "Export to file",
@@ -664,6 +681,10 @@ private fun NoteDetail(vm: AppViewModel, nav: Navigator, item: NoteItem) {
             Spacer(Modifier.height(24.dp))
         }
     }
+
+    if (sendToPc) {
+        ShareToPcSheet(vm = vm, item = item, onDismiss = { sendToPc = false })
+    }
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -673,6 +694,7 @@ private fun NoteDetail(vm: AppViewModel, nav: Navigator, item: NoteItem) {
 @Composable
 private fun IdentityDetail(vm: AppViewModel, nav: Navigator, item: IdentityItem) {
     val context = LocalContext.current
+    var sendToPc by remember { mutableStateOf(false) }
 
     Column(
         Modifier
@@ -752,6 +774,8 @@ private fun IdentityDetail(vm: AppViewModel, nav: Navigator, item: IdentityItem)
 
             Spacer(Modifier.height(14.dp))
             AegisCard(modifier = Modifier.padding(horizontal = 20.dp), padding = 0.dp) {
+                SendToPcAction { sendToPc = true }
+                AegisDivider(startPadding = 62.dp)
                 ActionRow(
                     icon = R.drawable.ic_share_2,
                     label = "Share identity",
@@ -774,11 +798,15 @@ private fun IdentityDetail(vm: AppViewModel, nav: Navigator, item: IdentityItem)
 
             Spacer(Modifier.height(14.dp))
             InfoNote(
-                "Stored only on this device. Aegis never uploads identity details anywhere.",
+                "Stored encrypted on this device. With cloud backup on, only the encrypted vault ever leaves your phone.",
                 icon = R.drawable.ic_lock,
                 modifier = Modifier.padding(horizontal = 20.dp),
             )
             Spacer(Modifier.height(24.dp))
         }
+    }
+
+    if (sendToPc) {
+        ShareToPcSheet(vm = vm, item = item, onDismiss = { sendToPc = false })
     }
 }
